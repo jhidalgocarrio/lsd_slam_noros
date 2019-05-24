@@ -21,6 +21,7 @@
 #include "slam_system.h"
 
 #include "model/frame.h"
+#include "model/frame_memory.h"
 #include "tracking/se3_tracker.h"
 #include "tracking/sim3_tracker.h"
 #include "depth_estimation/depth_map.h"
@@ -32,8 +33,9 @@
 #include "global_mapping/g2o_type_sim3_sophus.h"
 #include "io_wrapper/image_display.h"
 #include "io_wrapper/output_3d_wrapper.h"
+
 #include <g2o/core/robust_kernel_impl.h>
-#include "model/frame_memory.h"
+#include <opencv2/opencv.hpp>
 
 #include "util/snprintf.h"
 
@@ -49,7 +51,6 @@
 #include <android/log.h>
 #endif
 
-#include "opencv2/opencv.hpp"
 
 using namespace lsd_slam;
 
@@ -73,11 +74,10 @@ SlamSystem::SlamSystem(int w, int h, Eigen::Matrix3f K) : relocalizer(w,h,K)
     keyFrameGraph = new KeyFrameGraph();
     createNewKeyFrame = false;
 
-    map =  new DepthMap(w,h,K);
+    map = new DepthMap(w,h,K);
 
     newConstraintAdded = false;
     haveUnmergedOptimizationOffset = false;
-
 
     tracker = new SE3Tracker(w,h,K);
     // Do not use more than 4 levels for odometry tracking
@@ -1143,9 +1143,7 @@ float SlamSystem::tryTrackSim3(
                            datimesb_db.transpose()).inverse();
     Vector7 diff = (AtoB * BtoA).log().cast<float>();
 
-
     float reciprocalConsistency = (diffHesse * diff).dot(diff);
-
 
     if(e1 != 0 && e2 != 0)
     {
