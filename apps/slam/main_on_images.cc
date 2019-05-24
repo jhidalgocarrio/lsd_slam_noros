@@ -210,7 +210,6 @@ int main(int argc, char* argv[])
     Sophus::Matrix3f K;
     K << fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0;
 
-
     // make output wrapper. just set to zero if no output is required.
     Output3DWrapper* outputWrapper = nullptr; // new ROSOutput3DWrapper(w,h);
 
@@ -232,8 +231,6 @@ int main(int argc, char* argv[])
     int runningIDX=0;
     float fakeTimeStamp = 0;
 
-    //ros::Rate r(hz);
-
     for(unsigned int i=0; i<files.size(); i++)
     {
         std::cout << "reading " << files[i] << std::endl;
@@ -252,9 +249,6 @@ int main(int argc, char* argv[])
         runningIDX++;
         fakeTimeStamp+=0.03;
 
-        //if(hz != 0)
-        //    r.sleep();
-
         if(fullResetRequested)
         {
 
@@ -267,14 +261,9 @@ int main(int argc, char* argv[])
             fullResetRequested = false;
             runningIDX = 0;
         }
-
-        //ros::spinOnce();
     }
 
-
     system->finalize();
-
-
 
     delete system;
     delete undistorter;
