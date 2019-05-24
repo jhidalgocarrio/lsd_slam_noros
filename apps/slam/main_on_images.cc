@@ -215,7 +215,7 @@ int main(int argc, char* argv[])
     Output3DWrapper* outputWrapper = nullptr; // new ROSOutput3DWrapper(w,h);
 
     // make slam system
-    SlamSystem* system = new SlamSystem(w, h, K, doSlam);
+    SlamSystem* system = new SlamSystem(w, h, K);
     system->setVisualization(outputWrapper);
 
     std::vector<std::string> files;
@@ -261,7 +261,7 @@ int main(int argc, char* argv[])
             printf("FULL RESET!\n");
             delete system;
 
-            system = new SlamSystem(w, h, K, doSlam);
+            system = new SlamSystem(w, h, K);
             system->setVisualization(outputWrapper);
 
             fullResetRequested = false;

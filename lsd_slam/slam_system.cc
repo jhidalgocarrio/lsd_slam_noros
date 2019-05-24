@@ -54,8 +54,7 @@
 using namespace lsd_slam;
 
 
-SlamSystem::SlamSystem(int w, int h, Eigen::Matrix3f K, bool enableSLAM)
-    : SLAMEnabled(enableSLAM), relocalizer(w,h,K)
+SlamSystem::SlamSystem(int w, int h, Eigen::Matrix3f K) : relocalizer(w,h,K)
 {
     if(w%16 != 0 || h%16!=0)
     {
@@ -88,23 +87,11 @@ SlamSystem::SlamSystem(int w, int h, Eigen::Matrix3f K, bool enableSLAM)
     mappingTrackingReference = new TrackingReference();
 
 
-    if(SLAMEnabled)
-    {
-        trackableKeyFrameSearch = new TrackableKeyFrameSearch(keyFrameGraph,w,h,K);
-        constraintTracker = new Sim3Tracker(w,h,K);
-        constraintSE3Tracker = new SE3Tracker(w,h,K);
-        newKFTrackingReference = new TrackingReference();
-        candidateTrackingReference = new TrackingReference();
-    }
-    else
-    {
-        constraintSE3Tracker = 0;
-        trackableKeyFrameSearch = 0;
-        constraintTracker = 0;
-        newKFTrackingReference = 0;
-        candidateTrackingReference = 0;
-    }
-
+    trackableKeyFrameSearch = new TrackableKeyFrameSearch(keyFrameGraph,w,h,K);
+    constraintTracker = new Sim3Tracker(w,h,K);
+    constraintSE3Tracker = new SE3Tracker(w,h,K);
+    newKFTrackingReference = new TrackingReference();
+    candidateTrackingReference = new TrackingReference();
 
     outputWrapper = 0;
 
@@ -115,14 +102,9 @@ SlamSystem::SlamSystem(int w, int h, Eigen::Matrix3f K, bool enableSLAM)
 
     thread_mapping = boost::thread(&SlamSystem::mappingThreadLoop, this);
 
-    if(SLAMEnabled)
-    {
-        thread_constraint_search = boost::thread(
-                                       &SlamSystem::constraintSearchThreadLoop, this);
-        thread_optimization = boost::thread(&SlamSystem::optimizationThreadLoop, this);
-    }
-
-
+    thread_constraint_search = boost::thread(
+                                   &SlamSystem::constraintSearchThreadLoop, this);
+    thread_optimization = boost::thread(&SlamSystem::optimizationThreadLoop, this);
 
     msTrackFrame = msOptimizationIteration = msFindConstraintsItaration =
                        msFindReferences = 0;
@@ -410,26 +392,23 @@ void SlamSystem::finishCurrentKeyframe()
 
     map->finalizeKeyFrame();
 
-    if(SLAMEnabled)
+    mappingTrackingReference->importFrame(currentKeyFrame.get());
+    currentKeyFrame->setPermaRef(mappingTrackingReference);
+    mappingTrackingReference->invalidate();
+
+    if(currentKeyFrame->idxInKeyframes < 0)
     {
-        mappingTrackingReference->importFrame(currentKeyFrame.get());
-        currentKeyFrame->setPermaRef(mappingTrackingReference);
-        mappingTrackingReference->invalidate();
+        keyFrameGraph->keyframesAllMutex.lock();
+        currentKeyFrame->idxInKeyframes = keyFrameGraph->keyframesAll.size();
+        keyFrameGraph->keyframesAll.push_back(currentKeyFrame.get());
+        keyFrameGraph->totalPoints += currentKeyFrame->numPoints;
+        keyFrameGraph->totalVertices ++;
+        keyFrameGraph->keyframesAllMutex.unlock();
 
-        if(currentKeyFrame->idxInKeyframes < 0)
-        {
-            keyFrameGraph->keyframesAllMutex.lock();
-            currentKeyFrame->idxInKeyframes = keyFrameGraph->keyframesAll.size();
-            keyFrameGraph->keyframesAll.push_back(currentKeyFrame.get());
-            keyFrameGraph->totalPoints += currentKeyFrame->numPoints;
-            keyFrameGraph->totalVertices ++;
-            keyFrameGraph->keyframesAllMutex.unlock();
-
-            newKeyFrameMutex.lock();
-            newKeyFrames.push_back(currentKeyFrame.get());
-            newKeyFrameCreatedSignal.notify_all();
-            newKeyFrameMutex.unlock();
-        }
+        newKeyFrameMutex.lock();
+        newKeyFrames.push_back(currentKeyFrame.get());
+        newKeyFrameCreatedSignal.notify_all();
+        newKeyFrameMutex.unlock();
     }
 
     if(outputWrapper!= 0)
@@ -474,15 +453,11 @@ void SlamSystem::createNewCurrentKeyframe(std::shared_ptr<Frame>
         printf("CREATE NEW KF %d from %d\n", newKeyframeCandidate->id(),
                currentKeyFrame->id());
 
-
-    if(SLAMEnabled)
-    {
-        // add NEW keyframe to id-lookup
-        keyFrameGraph->idToKeyFrameMutex.lock();
-        keyFrameGraph->idToKeyFrame.insert(std::make_pair(newKeyframeCandidate->id(),
-                                           newKeyframeCandidate));
-        keyFrameGraph->idToKeyFrameMutex.unlock();
-    }
+    // add NEW keyframe to id-lookup
+    keyFrameGraph->idToKeyFrameMutex.lock();
+    keyFrameGraph->idToKeyFrame.insert(std::make_pair(newKeyframeCandidate->id(),
+                                       newKeyframeCandidate));
+    keyFrameGraph->idToKeyFrameMutex.unlock();
 
     // propagate & make new.
     map->createKeyFrame(newKeyframeCandidate.get());
@@ -526,7 +501,7 @@ void SlamSystem::changeKeyframe(bool noCreate, bool force, float maxScore)
 {
     Frame* newReferenceKF=0;
     std::shared_ptr<Frame> newKeyframeCandidate = latestTrackedFrame;
-    if(doKFReActivation && SLAMEnabled)
+    if(doKFReActivation)
     {
         std::chrono::high_resolution_clock::time_point tv_start, tv_end;
         //gettimeofday(&tv_start, NULL);
@@ -755,9 +730,8 @@ void SlamSystem::takeRelocalizeResult()
         succFrame.get(),
         succFrameToKF_init);
 
-    if(!tracker->trackingWasGood
-            || tracker->lastGoodCount / (tracker->lastGoodCount + tracker->lastBadCount) <
-            1-0.75f*(1-MIN_GOODPERGOODBAD_PIXEL))
+    if(!tracker->trackingWasGood ||
+       tracker->lastGoodCount / (tracker->lastGoodCount + tracker->lastBadCount) < 1-0.75f*(1-MIN_GOODPERGOODBAD_PIXEL))
     {
         if(enablePrintDebugInfo && printRelocalizationInfo)
             printf("RELOCALIZATION FAILED BADLY! discarding result.\n");
@@ -886,13 +860,11 @@ void SlamSystem::gtDepthInit(uchar* image, float* depth, double timeStamp,
 
     currentKeyFrameMutex.unlock();
 
-    if(doSlam)
-    {
-        keyFrameGraph->idToKeyFrameMutex.lock();
-        keyFrameGraph->idToKeyFrame.insert(std::make_pair(currentKeyFrame->id(),
-                                           currentKeyFrame));
-        keyFrameGraph->idToKeyFrameMutex.unlock();
-    }
+    keyFrameGraph->idToKeyFrameMutex.lock();
+    keyFrameGraph->idToKeyFrame.insert(std::make_pair(currentKeyFrame->id(),
+                                       currentKeyFrame));
+    keyFrameGraph->idToKeyFrameMutex.unlock();
+
     if(continuousPCOutput
             && outputWrapper != 0) outputWrapper->publishKeyframe(currentKeyFrame.get());
 
@@ -916,13 +888,11 @@ void SlamSystem::randomInit(uchar* image, double timeStamp, int id)
 
     currentKeyFrameMutex.unlock();
 
-    if(doSlam)
-    {
-        keyFrameGraph->idToKeyFrameMutex.lock();
-        keyFrameGraph->idToKeyFrame.insert(std::make_pair(currentKeyFrame->id(),
-                                           currentKeyFrame));
-        keyFrameGraph->idToKeyFrameMutex.unlock();
-    }
+    keyFrameGraph->idToKeyFrameMutex.lock();
+    keyFrameGraph->idToKeyFrame.insert(std::make_pair(currentKeyFrame->id(),
+                                       currentKeyFrame));
+    keyFrameGraph->idToKeyFrameMutex.unlock();
+
     if(continuousPCOutput
             && outputWrapper != 0) outputWrapper->publishKeyframe(currentKeyFrame.get());
 
