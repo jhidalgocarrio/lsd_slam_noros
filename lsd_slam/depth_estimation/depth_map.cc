@@ -1727,9 +1727,7 @@ inline float DepthMap::doLineStereo(
         }
 
         // get new epl length
-        float fincx = pClose[0] - pFar[0];
-        float fincy = pClose[1] - pFar[1];
-        float newEplLength = sqrt(fincx*fincx+fincy*fincy);
+        float newEplLength = (pClose - pFar).norm();
 
         // test again
         if(!isInExclusiveImageRange(pClose, SAMPLE_POINT_TO_BORDER) || newEplLength < 8)
