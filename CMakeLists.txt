@@ -48,7 +48,7 @@ elseif(CMAKE_BUILD_TYPE MATCHES RelWithDebInfo)
 elseif(CMAKE_BUILD_TYPE MATCHES MinSizeRel)
   set(EXE_POSTFIX ${CMAKE_MINSIZEREL_POSTFIX})
 endif(CMAKE_BUILD_TYPE MATCHES Release)
-  
+
 set(LsdSlam_RUNTIME_OUTPUT_DIRECTORY ${LSD_SLAM_DIR}/bin CACHE PATH "Target for the binaries")
 set(LsdSlam_LIBRARY_OUTPUT_DIRECTORY ${LSD_SLAM_DIR}/lib CACHE PATH "Target for the libraries")
 link_directories(${LsdSlam_LIBRARY_OUTPUT_DIRECTORY})
@@ -163,7 +163,7 @@ add_custom_target(uninstall
   COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
 
 
-# Useful paths configuration for windows 
+# Useful paths configuration for windows
 if(WIN32)
   if(MSVC)
     if(CMAKE_CL_64)
@@ -186,9 +186,9 @@ if(WIN32)
       get_filename_component(VC_IDE_PATH $ENV{VS120COMNTOOLS}/../IDE ABSOLUTE)
     endif()
   endif()
-  configure_file("${CMAKE_CURRENT_SOURCE_DIR}/scripts/set_paths.bat.in" 
+  configure_file("${CMAKE_CURRENT_SOURCE_DIR}/scripts/set_paths.bat.in"
                  "${CMAKE_CURRENT_BINARY_DIR}/set_paths.bat")
-  configure_file("${CMAKE_CURRENT_SOURCE_DIR}/scripts/set_paths.bat.in" 
+  configure_file("${CMAKE_CURRENT_SOURCE_DIR}/scripts/set_paths.bat.in"
                  "${LsdSlam_RUNTIME_OUTPUT_DIRECTORY}/set_paths.bat")
   configure_file("${CMAKE_CURRENT_SOURCE_DIR}/scripts/set_paths_and_run_vc.bat.in"
                  "${CMAKE_CURRENT_BINARY_DIR}/set_paths_and_run_vc.bat")

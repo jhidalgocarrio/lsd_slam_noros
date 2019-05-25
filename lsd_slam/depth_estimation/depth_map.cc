@@ -47,15 +47,12 @@ DepthMap::DepthMap(int w, int h, const Eigen::Matrix3f& K)
     otherDepthMap = new DepthMapPixelHypothesis[width*height];
     currentDepthMap = new DepthMapPixelHypothesis[width*height];
 
-    validityIntegralBuffer =new int[width*height];
-
-
+    validityIntegralBuffer = new int[width*height];
 
     debugImageHypothesisHandling = cv::Mat(h,w, CV_8UC3);
     debugImageHypothesisPropagation = cv::Mat(h,w, CV_8UC3);
     debugImageStereoLines = cv::Mat(h,w, CV_8UC3);
     debugImageDepth = cv::Mat(h,w, CV_8UC3);
-
 
     this->K = K;
     fx = K(0,0);
@@ -71,15 +68,13 @@ DepthMap::DepthMap(int w, int h, const Eigen::Matrix3f& K)
 
     reset();
 
-    msUpdate =  msCreate =  msFinalize = 0;
-    msObserve =  msRegularize =  msPropagate =  msFillHoles =  msSetDepth = 0;
-    // gettimeofday(&lastHzUpdate, NULL);
+    msUpdate = msCreate = msFinalize = msObserve
+             = msRegularize = msPropagate = msFillHoles = msSetDepth = 0;
     lastHzUpdate = std::chrono::high_resolution_clock::now();
-    nUpdate = nCreate = nFinalize = 0;
-    nObserve = nRegularize = nPropagate = nFillHoles = nSetDepth = 0;
-    nAvgUpdate = nAvgCreate = nAvgFinalize = 0;
-    nAvgObserve = nAvgRegularize = nAvgPropagate = nAvgFillHoles = nAvgSetDepth =
-                                       0;
+    nUpdate = nCreate = nFinalize = nObserve
+            = nRegularize = nPropagate = nFillHoles = nSetDepth = 0;
+    nAvgUpdate = nAvgCreate = nAvgFinalize = nAvgObserve = nAvgRegularize
+               = nAvgPropagate = nAvgFillHoles = nAvgSetDepth = 0;
 }
 
 DepthMap::~DepthMap()
@@ -96,18 +91,14 @@ DepthMap::~DepthMap()
     delete[] currentDepthMap;
 
     delete[] validityIntegralBuffer;
-
-
 }
 
 
 void DepthMap::reset()
 {
-    for(DepthMapPixelHypothesis* pt = otherDepthMap+width*height-1;
-            pt >= otherDepthMap; pt--)
+    for(DepthMapPixelHypothesis* pt = otherDepthMap+width*height-1; pt >= otherDepthMap; pt--)
         pt->isValid = false;
-    for(DepthMapPixelHypothesis* pt = currentDepthMap+width*height-1;
-            pt >= currentDepthMap; pt--)
+    for(DepthMapPixelHypothesis* pt = currentDepthMap+width*height-1; pt >= currentDepthMap; pt--)
         pt->isValid = false;
 }
 
@@ -213,8 +204,7 @@ bool DepthMap::makeAndCheckEPL(const int x, const int y,
 
     // ===== check epl-grad magnitude ======
     float gx = activeKeyFrameImageData[idx+1] - activeKeyFrameImageData[idx-1];
-    float gy = activeKeyFrameImageData[idx+width] - activeKeyFrameImageData[idx
-               -width];
+    float gy = activeKeyFrameImageData[idx+width] - activeKeyFrameImageData[idx-width];
     float eplGradSquared = gx * epx + gy * epy;
     eplGradSquared = eplGradSquared*eplGradSquared /
                      eplLengthSquared;	// square and norm with epl-length
@@ -254,13 +244,13 @@ bool DepthMap::observeDepthCreate(const int &x, const int &y, const int &idx,
     if(refFrame->getTrackingParent() == activeKeyFrame)
     {
         bool* wasGoodDuringTracking = refFrame->refPixelWasGoodNoCreate();
-        if(wasGoodDuringTracking != 0
-                && !wasGoodDuringTracking[(x >> SE3TRACKING_MIN_LEVEL) +
-                                                                       (width >> SE3TRACKING_MIN_LEVEL)*(y >> SE3TRACKING_MIN_LEVEL)])
+        if(wasGoodDuringTracking != 0 &&
+           !wasGoodDuringTracking[(x >> SE3TRACKING_MIN_LEVEL) + (width >> SE3TRACKING_MIN_LEVEL)*(y >> SE3TRACKING_MIN_LEVEL)])
         {
-            if(plotStereoImages)
-                debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(255,0,
-                        0); // BLUE for SKIPPED NOT GOOD TRACKED
+            if(plotStereoImages) {
+                // BLUE for SKIPPED NOT GOOD TRACKED
+                debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(255,0,0);
+            }
             return false;
         }
     }
@@ -329,8 +319,7 @@ bool DepthMap::observeDepthUpdate(const int &x, const int &y, const int &idx,
         if((int)target->nextStereoFrameMinID - referenceFrameByID_offset < 0)
             refFrame = oldest_referenceFrame;
         else
-            refFrame = referenceFrameByID[(int)target->nextStereoFrameMinID -
-                                                                            referenceFrameByID_offset];
+            refFrame = referenceFrameByID[(int)target->nextStereoFrameMinID - referenceFrameByID_offset];
     }
     else
         refFrame = newest_referenceFrame;
@@ -1694,8 +1683,7 @@ inline float DepthMap::doLineStereo(
     }
 
     // if inf point is outside of image: skip pixel.
-    if(
-        pFar[0] <= SAMPLE_POINT_TO_BORDER ||
+    if( pFar[0] <= SAMPLE_POINT_TO_BORDER ||
         pFar[0] >= width-SAMPLE_POINT_TO_BORDER ||
         pFar[1] <= SAMPLE_POINT_TO_BORDER ||
         pFar[1] >= height-SAMPLE_POINT_TO_BORDER)
@@ -1707,8 +1695,7 @@ inline float DepthMap::doLineStereo(
 
 
     // if near point is outside: move inside, and test length again.
-    if(
-        pClose[0] <= SAMPLE_POINT_TO_BORDER ||
+    if( pClose[0] <= SAMPLE_POINT_TO_BORDER ||
         pClose[0] >= width-SAMPLE_POINT_TO_BORDER ||
         pClose[1] <= SAMPLE_POINT_TO_BORDER ||
         pClose[1] >= height-SAMPLE_POINT_TO_BORDER)

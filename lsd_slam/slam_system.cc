@@ -865,8 +865,9 @@ void SlamSystem::gtDepthInit(uchar* image, float* depth, double timeStamp,
                                        currentKeyFrame));
     keyFrameGraph->idToKeyFrameMutex.unlock();
 
-    if(continuousPCOutput
-            && outputWrapper != 0) outputWrapper->publishKeyframe(currentKeyFrame.get());
+    if(continuousPCOutput && outputWrapper != 0) {
+        outputWrapper->publishKeyframe(currentKeyFrame.get());
+    }
 
     printf("Done GT initialization!\n");
 }
@@ -893,8 +894,9 @@ void SlamSystem::randomInit(uchar* image, double timeStamp, int id)
                                        currentKeyFrame));
     keyFrameGraph->idToKeyFrameMutex.unlock();
 
-    if(continuousPCOutput
-            && outputWrapper != 0) outputWrapper->publishKeyframe(currentKeyFrame.get());
+    if(continuousPCOutput && outputWrapper != 0) {
+        outputWrapper->publishKeyframe(currentKeyFrame.get());
+    }
 
 
     if (displayDepthMap || depthMapScreenshotFlag)

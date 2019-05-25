@@ -30,11 +30,7 @@
 #include <dirent.h>
 #include <algorithm>
 
-//#include "IOWrapper/ROS/ROSOutput3DWrapper.h"
-//#include "IOWrapper/ROS/rosReconfigure.h"
-
 #include "util/undistorter.h"
-//#include <ros/package.h>
 
 #include "opencv2/opencv.hpp"
 
