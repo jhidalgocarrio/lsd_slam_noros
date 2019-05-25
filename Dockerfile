@@ -29,20 +29,21 @@ RUN wget https://github.com/opencv/opencv/archive/$OPENCV_VERSION.tar.gz \
     && rm $OPENCV_VERSION.tar.gz \
     && rm -r opencv-$OPENCV_VERSION
 
+
 # install Eigen
 
 WORKDIR $WORKSPACE
 
-RUN wget -c https://bitbucket.org/eigen/eigen/get/3.1.4.tar.gz \
-    && tar xvf 3.1.4.tar.gz \
-    && cd eigen-eigen-36bf2ceaf8f5 \
+RUN wget -c https://bitbucket.org/eigen/eigen/get/3.2.1.tar.gz \
+    && tar xvf 3.2.1.tar.gz \
+    && cd eigen-eigen-6b38706d90a9 \
     && mkdir build \
     && cd build \
     && cmake .. \
     && make install \
     && cd ../../ \
-    && rm 3.1.4.tar.gz \
-    && rm -r eigen-eigen-36bf2ceaf8f5
+    && rm 3.2.1.tar.gz \
+    && rm -r eigen-eigen-6b38706d90a9
 
 
 # install g2o
