@@ -108,9 +108,6 @@ include(LsdSlamDependencies_Config)  # option for manual configuration
 include(LsdSlamDependencies)
 
 # Thirdparty libs ==============================================================
-# Eigen
-include_directories(${LSD_SLAM_DIR}/thirdparty/eigen-3.2.1)
-
 # Sophus
 include_directories(${LSD_SLAM_DIR}/thirdparty/Sophus)
 

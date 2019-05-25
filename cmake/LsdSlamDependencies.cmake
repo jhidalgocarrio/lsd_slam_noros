@@ -71,6 +71,13 @@ cull_library_paths(G2O_LIBRARIES)
 list(APPEND LsdSlam_EXTERNAL_LIBS ${G2O_LIBRARIES})
 
 ##==============================================================================
+# Eigen
+find_path(EIGEN3_INCLUDE_DIR NAMES signature_of_eigen3_matrix_library
+          PATHS include
+          PATH_SUFFIXES eigen3 include/eigen3)
+
+include_directories(${EIGEN3_INCLUDE_DIR})
+
 # OpenGL
 find_package(OpenGL)
 lsd_slam_print_status("Found OpenGL ? ${OPENGL_FOUND}")
