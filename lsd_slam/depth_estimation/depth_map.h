@@ -131,6 +131,8 @@ private:
 
 
 
+    bool isIn2Sigma(float u, float v, float epxn, float epyn, float rescaleFactor);
+
     // ============ internal functions ==================================================
     // does the line-stereo seeking.
     // takes a lot of parameters, because they all have been pre-computed before.

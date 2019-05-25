@@ -32,7 +32,7 @@
 #include "util/global_funcs.h"
 #include "io_wrapper/image_display.h"
 #include "global_mapping/key_frame_graph.h"
-
+#include "projection/projection.h"
 
 namespace lsd_slam
 {
@@ -1560,6 +1560,20 @@ int DepthMap::debugPlotDepthMap()
 }
 
 
+bool isInExclusiveRange(float x, float low, float high) {
+    return low < x && x < high;
+}
+
+
+bool DepthMap::isIn2Sigma(float u, float v, float epxn, float epyn, float rescaleFactor) {
+    float xn = u - 2*epxn*rescaleFactor;
+    float yn = v - 2*epyn*rescaleFactor;
+    float xp = u + 2*epxn*rescaleFactor;
+    float yp = v + 2*epyn*rescaleFactor;
+    // width - 2 and height - 2 comes from the one-sided gradient calculation at the bottom
+    return 0 < xn && xn < width - 2 && 0 < yn && yn < height - 2 &&
+           0 < xp && xp < width - 2 && 0 < yp && yp < height - 2;
+}
 
 
 // find pixel in image (do stereo along epipolar line).
@@ -1587,60 +1601,49 @@ inline float DepthMap::doLineStereo(
 
     float rescaleFactor = pReal[2] * prior_idepth;
 
-    float firstX = u - 2*epxn*rescaleFactor;
-    float firstY = v - 2*epyn*rescaleFactor;
-    float lastX = u + 2*epxn*rescaleFactor;
-    float lastY = v + 2*epyn*rescaleFactor;
-    // width - 2 and height - 2 comes from the one-sided gradient calculation at the bottom
-    if (firstX <= 0 || firstX >= width - 2
-            || firstY <= 0 || firstY >= height - 2
-            || lastX <= 0 || lastX >= width - 2
-            || lastY <= 0 || lastY >= height - 2) {
+    if(!isIn2Sigma(u, v, epxn, epyn, rescaleFactor)) {
         return -1;
     }
 
-    if(!(rescaleFactor > 0.7f && rescaleFactor < 1.4f))
+    if(!isInExclusiveRange(rescaleFactor, 0.7f, 1.4f))
     {
         if(enablePrintDebugInfo) stats->num_stereo_rescale_oob++;
         return -1;
     }
 
     // calculate values to search for
-    float realVal_p1 = getInterpolatedElement(activeKeyFrameImageData,
-                       u + epxn*rescaleFactor, v + epyn*rescaleFactor, width);
-    float realVal_m1 = getInterpolatedElement(activeKeyFrameImageData,
-                       u - epxn*rescaleFactor, v - epyn*rescaleFactor, width);
-    float realVal = getInterpolatedElement(activeKeyFrameImageData,u, v, width);
-    float realVal_m2 = getInterpolatedElement(activeKeyFrameImageData,
-                       u - 2*epxn*rescaleFactor, v - 2*epyn*rescaleFactor, width);
     float realVal_p2 = getInterpolatedElement(activeKeyFrameImageData,
                        u + 2*epxn*rescaleFactor, v + 2*epyn*rescaleFactor, width);
+    float realVal_p1 = getInterpolatedElement(activeKeyFrameImageData,
+                       u + epxn*rescaleFactor, v + epyn*rescaleFactor, width);
+    float realVal = getInterpolatedElement(activeKeyFrameImageData,u, v, width);
+    float realVal_m1 = getInterpolatedElement(activeKeyFrameImageData,
+                       u - epxn*rescaleFactor, v - epyn*rescaleFactor, width);
+    float realVal_m2 = getInterpolatedElement(activeKeyFrameImageData,
+                       u - 2*epxn*rescaleFactor, v - 2*epyn*rescaleFactor, width);
 
+    Eigen::Vector3f PClose = pInf + referenceFrame->K_otherToThis_t*max_idepth;
+    Eigen::Vector3f PFar = pInf + referenceFrame->K_otherToThis_t*min_idepth;
 
-
-//	if(referenceFrame->K_otherToThis_t[2] * max_idepth + pInf[2] < 0.01)
-
-
-    Eigen::Vector3f pClose = pInf + referenceFrame->K_otherToThis_t*max_idepth;
     // if the assumed close-point lies behind the
     // image, have to change that.
-    if(pClose[2] < 0.001)
+    if(PClose[2] < 0.001)
     {
         max_idepth = (0.001-pInf[2]) / referenceFrame->K_otherToThis_t[2];
-        pClose = pInf + referenceFrame->K_otherToThis_t*max_idepth;
+        PClose = pInf + referenceFrame->K_otherToThis_t*max_idepth;
     }
-    pClose = pClose /
-             pClose[2]; // pos in new image of point (xy), assuming max_idepth
 
-    Eigen::Vector3f pFar = pInf + referenceFrame->K_otherToThis_t*min_idepth;
     // if the assumed far-point lies behind the image or closter than the near-point,
     // we moved past the Point it and should stop.
-    if(pFar[2] < 0.001 || max_idepth < min_idepth)
+    if(PFar[2] < 0.001 || max_idepth < min_idepth)
     {
         if(enablePrintDebugInfo) stats->num_stereo_inf_oob++;
         return -1;
     }
-    pFar = pFar / pFar[2]; // pos in new image of point (xy), assuming min_idepth
+
+    // pos in new image of point (xy), assuming max_idepth
+    Eigen::Vector2f pClose = projection(PClose);
+    Eigen::Vector2f pFar = projection(PFar); // pos in new image of point (xy), assuming min_idepth
 
 
     // check for nan due to eg division by zero.
