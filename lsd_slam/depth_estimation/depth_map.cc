@@ -1732,11 +1732,7 @@ inline float DepthMap::doLineStereo(
         float newEplLength = sqrt(fincx*fincx+fincy*fincy);
 
         // test again
-        if(pClose[0] <= SAMPLE_POINT_TO_BORDER ||
-           pClose[0] >= width-SAMPLE_POINT_TO_BORDER ||
-           pClose[1] <= SAMPLE_POINT_TO_BORDER ||
-           pClose[1] >= height-SAMPLE_POINT_TO_BORDER ||
-           newEplLength < 8)
+        if(!isInExclusiveImageRange(pClose, SAMPLE_POINT_TO_BORDER) || newEplLength < 8)
         {
             if(enablePrintDebugInfo) stats->num_stereo_near_oob++;
             return -1;
