@@ -132,6 +132,7 @@ private:
 
 
     bool isIn2Sigma(float u, float v, float epxn, float epyn, float rescaleFactor);
+    bool isInExclusiveImageRange(Eigen::Vector2f x, float margin=0);
 
     // ============ internal functions ==================================================
     // does the line-stereo seeking.

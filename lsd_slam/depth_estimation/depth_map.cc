@@ -1576,6 +1576,12 @@ bool DepthMap::isIn2Sigma(float u, float v, float epxn, float epyn, float rescal
 }
 
 
+bool DepthMap::isInExclusiveImageRange(Eigen::Vector2f x, float margin) {
+    return isInExclusiveRange(x(0), margin, width-margin) &&
+           isInExclusiveRange(x(1), margin, height-margin);
+}
+
+
 // find pixel in image (do stereo along epipolar line).
 // mat: NEW image
 // KinvP: point in OLD image (Kinv * (u_old, v_old, 1)), projected
@@ -1686,22 +1692,15 @@ inline float DepthMap::doLineStereo(
     }
 
     // if inf point is outside of image: skip pixel.
-    if( pFar[0] <= SAMPLE_POINT_TO_BORDER ||
-        pFar[0] >= width-SAMPLE_POINT_TO_BORDER ||
-        pFar[1] <= SAMPLE_POINT_TO_BORDER ||
-        pFar[1] >= height-SAMPLE_POINT_TO_BORDER)
+    if(!isInExclusiveImageRange(pFar, SAMPLE_POINT_TO_BORDER))
     {
         if(enablePrintDebugInfo) stats->num_stereo_inf_oob++;
         return -1;
     }
 
-
-
     // if near point is outside: move inside, and test length again.
-    if( pClose[0] <= SAMPLE_POINT_TO_BORDER ||
-        pClose[0] >= width-SAMPLE_POINT_TO_BORDER ||
-        pClose[1] <= SAMPLE_POINT_TO_BORDER ||
-        pClose[1] >= height-SAMPLE_POINT_TO_BORDER)
+
+    if(!isInExclusiveImageRange(pClose, SAMPLE_POINT_TO_BORDER))
     {
         if(pClose[0] <= SAMPLE_POINT_TO_BORDER)
         {
@@ -1735,13 +1734,11 @@ inline float DepthMap::doLineStereo(
         float newEplLength = sqrt(fincx*fincx+fincy*fincy);
 
         // test again
-        if(
-            pClose[0] <= SAMPLE_POINT_TO_BORDER ||
-            pClose[0] >= width-SAMPLE_POINT_TO_BORDER ||
-            pClose[1] <= SAMPLE_POINT_TO_BORDER ||
-            pClose[1] >= height-SAMPLE_POINT_TO_BORDER ||
-            newEplLength < 8
-        )
+        if(pClose[0] <= SAMPLE_POINT_TO_BORDER ||
+           pClose[0] >= width-SAMPLE_POINT_TO_BORDER ||
+           pClose[1] <= SAMPLE_POINT_TO_BORDER ||
+           pClose[1] >= height-SAMPLE_POINT_TO_BORDER ||
+           newEplLength < 8)
         {
             if(enablePrintDebugInfo) stats->num_stereo_near_oob++;
             return -1;
