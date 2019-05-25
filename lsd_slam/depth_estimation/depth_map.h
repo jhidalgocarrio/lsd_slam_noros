@@ -21,12 +21,13 @@
 #pragma once
 #include <chrono>
 #include <deque>
+#include <Eigen/Core>
+
 #include "util/eigen_core_include.h"
 #include "opencv2/core/core.hpp"
 #include "util/settings.h"
 #include "util/index_thread_reduce.h"
 #include "util/sophus_util.h"
-
 
 
 namespace lsd_slam

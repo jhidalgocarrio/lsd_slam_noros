@@ -1651,7 +1651,6 @@ inline float DepthMap::doLineStereo(
     Eigen::Vector2f pClose = projection(PClose);
     Eigen::Vector2f pFar = projection(PFar); // pos in new image of point (xy), assuming min_idepth
 
-
     // check for nan due to eg division by zero.
     if(std::isnan((float)(pFar[0]+pClose[0])))
         return -4;
@@ -1678,7 +1677,6 @@ inline float DepthMap::doLineStereo(
     pFar[1] -= incy;
     pClose[0] += incx;
     pClose[1] += incy;
-
 
     // make epl long enough (pad a little bit).
     if(eplLength < MIN_EPL_LENGTH_CROP)
@@ -1756,18 +1754,13 @@ inline float DepthMap::doLineStereo(
 
 
     float cpx = pFar[0];
-    float cpy =  pFar[1];
+    float cpy = pFar[1];
 
-    float val_cp_m2 = getInterpolatedElement(referenceFrameImage,cpx-2*incx,
-                      cpy-2*incy, width);
-    float val_cp_m1 = getInterpolatedElement(referenceFrameImage,cpx-incx,
-                      cpy-incy, width);
-    float val_cp = getInterpolatedElement(referenceFrameImage,cpx, cpy, width);
-    float val_cp_p1 = getInterpolatedElement(referenceFrameImage,cpx+incx,
-                      cpy+incy, width);
+    float val_cp_m2 = getInterpolatedElement(referenceFrameImage, cpx-2*incx, cpy-2*incy, width);
+    float val_cp_m1 = getInterpolatedElement(referenceFrameImage, cpx-incx, cpy-incy, width);
+    float val_cp = getInterpolatedElement(referenceFrameImage, cpx, cpy, width);
+    float val_cp_p1 = getInterpolatedElement(referenceFrameImage, cpx+incx, cpy+incy, width);
     float val_cp_p2;
-
-
 
     /*
      * Subsequent exact minimum is found the following way:
@@ -1812,7 +1805,7 @@ inline float DepthMap::doLineStereo(
             || loopCounter == 0)
     {
         // interpolate one new point
-        val_cp_p2 = getInterpolatedElement(referenceFrameImage,cpx+2*incx, cpy+2*incy,
+        val_cp_p2 = getInterpolatedElement(referenceFrameImage, cpx+2*incx, cpy+2*incy,
                                            width);
 
 
@@ -2063,10 +2056,6 @@ inline float DepthMap::doLineStereo(
                           dot2*referenceFrame->otherToThis_t[1]) / (nominator*nominator);
 
     }
-
-
-
-
 
     if(idnew_best_match < 0)
     {
