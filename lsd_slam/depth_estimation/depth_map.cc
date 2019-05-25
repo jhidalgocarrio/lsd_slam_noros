@@ -1762,8 +1762,7 @@ inline float DepthMap::doLineStereo(
 
     // walk in equally sized steps, starting at depth=infinity.
     int loopCounter = 0;
-    float best_match_x = -1;
-    float best_match_y = -1;
+    Eigen::Vector2f best_match;
     float best_match_err = 1e50;
     float second_best_match_err = 1e50;
 
@@ -1834,8 +1833,7 @@ inline float DepthMap::doLineStereo(
             best_match_errPost = -1;
             best_match_DiffErrPost = -1;
 
-            best_match_x = cp(0);
-            best_match_y = cp(1);
+            best_match = cp;
             bestWasLastLoop = true;
         }
         // otherwise: the last might be the current winner, in which case i have to save these values.
@@ -1950,8 +1948,7 @@ inline float DepthMap::doLineStereo(
         if(interpPre)
         {
             float d = gradPre_this / (gradPre_this - gradPre_pre);
-            best_match_x -= d*inc(0);
-            best_match_y -= d*inc(1);
+            best_match -= d*inc;
             best_match_err = best_match_err - 2*d*gradPre_this - (gradPre_pre -
                              gradPre_this)*d*d;
             if(enablePrintDebugInfo) stats->num_stereo_interpPre++;
@@ -1961,8 +1958,7 @@ inline float DepthMap::doLineStereo(
         else if(interpPost)
         {
             float d = gradPost_this / (gradPost_this - gradPost_post);
-            best_match_x += d*inc(0);
-            best_match_y += d*inc(1);
+            best_match += d*inc;
             best_match_err = best_match_err + 2*d*gradPost_this + (gradPost_post -
                              gradPost_this)*d*d;
             if(enablePrintDebugInfo) stats->num_stereo_interpPost++;
@@ -2006,7 +2002,7 @@ inline float DepthMap::doLineStereo(
     float alpha; // d(idnew_best_match) / d(disparity in pixel) == conputed inverse depth derived by the pixel-disparity.
     if(inc(0)*inc(0)>inc(1)*inc(1))
     {
-        float oldX = fxi*best_match_x+cxi;
+        float oldX = fxi*best_match(0)+cxi;
         float nominator = (oldX*referenceFrame->otherToThis_t[2] -
                            referenceFrame->otherToThis_t[0]);
         float dot0 = KinvP.dot(referenceFrame->otherToThis_R_row0);
@@ -2019,7 +2015,7 @@ inline float DepthMap::doLineStereo(
     }
     else
     {
-        float oldY = fyi*best_match_y+cyi;
+        float oldY = fyi*best_match(1)+cyi;
 
         float nominator = (oldY*referenceFrame->otherToThis_t[2] -
                            referenceFrame->otherToThis_t[1]);
