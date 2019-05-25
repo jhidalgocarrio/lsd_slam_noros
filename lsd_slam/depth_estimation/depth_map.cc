@@ -1732,13 +1732,12 @@ inline float DepthMap::doLineStereo(
     // - eplLength, min_idepth, max_idepth: determines search-resolution, i.e. the result's variance.
 
 
-    float cpx = pFar[0];
-    float cpy = pFar[1];
+    Eigen::Vector2f cp = pFar;
 
-    float val_cp_m2 = getInterpolatedElement(referenceFrameImage, cpx-2*inc(0), cpy-2*inc(1), width);
-    float val_cp_m1 = getInterpolatedElement(referenceFrameImage, cpx-inc(0), cpy-inc(1), width);
-    float val_cp = getInterpolatedElement(referenceFrameImage, cpx, cpy, width);
-    float val_cp_p1 = getInterpolatedElement(referenceFrameImage, cpx+inc(0), cpy+inc(1), width);
+    float val_cp_m2 = getInterpolatedElement(referenceFrameImage, cp-2*inc, width);
+    float val_cp_m1 = getInterpolatedElement(referenceFrameImage, cp-inc, width);
+    float val_cp = getInterpolatedElement(referenceFrameImage, cp, width);
+    float val_cp_p1 = getInterpolatedElement(referenceFrameImage, cp+inc, width);
     float val_cp_p2;
 
     /*
@@ -1780,13 +1779,11 @@ inline float DepthMap::doLineStereo(
           e5A=NAN, e5B=NAN;
 
     int loopCBest=-1, loopCSecond =-1;
-    while(((inc(0) < 0) == (cpx > pClose[0]) && (inc(1) < 0) == (cpy > pClose[1]))
-            || loopCounter == 0)
+    while(((inc(0) < 0) == (cp(0) > pClose[0]) && (inc(1) < 0) == (cp(1) > pClose[1])) ||
+          loopCounter == 0)
     {
         // interpolate one new point
-        val_cp_p2 = getInterpolatedElement(referenceFrameImage, cpx+2*inc(0), cpy+2*inc(1),
-                                           width);
-
+        val_cp_p2 = getInterpolatedElement(referenceFrameImage, cp+2*inc, width);
 
         // hacky but fast way to get error and differential error: switch buffer variables for last loop.
         float ee = 0;
@@ -1837,8 +1834,8 @@ inline float DepthMap::doLineStereo(
             best_match_errPost = -1;
             best_match_DiffErrPost = -1;
 
-            best_match_x = cpx;
-            best_match_y = cpy;
+            best_match_x = cp(0);
+            best_match_y = cp(1);
             bestWasLastLoop = true;
         }
         // otherwise: the last might be the current winner, in which case i have to save these values.
@@ -1870,8 +1867,7 @@ inline float DepthMap::doLineStereo(
 
         if(enablePrintDebugInfo) stats->num_stereo_comparisons++;
 
-        cpx += inc(0);
-        cpy += inc(1);
+        cp += inc;
 
         loopCounter++;
     }
@@ -1885,8 +1881,8 @@ inline float DepthMap::doLineStereo(
 
 
     // check if clear enough winner
-    if(abs(loopCBest - loopCSecond) > 1
-            && MIN_DISTANCE_ERROR_STEREO * best_match_err > second_best_match_err)
+    if(abs(loopCBest - loopCSecond) > 1 &&
+           MIN_DISTANCE_ERROR_STEREO * best_match_err > second_best_match_err)
     {
         if(enablePrintDebugInfo) stats->num_stereo_invalid_unclear_winner++;
         return -2;

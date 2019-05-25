@@ -39,8 +39,10 @@ SE3 SE3CV2Sophus(const cv::Mat& R, const cv::Mat& t);
 void printMessageOnCVImage(cv::Mat &image, std::string line1,
                            std::string line2);
 
+
 // reads interpolated element from a uchar* array
 // SSE2 optimization possible
+// FIXME passing 'width' is ugly, isn't it?
 inline float getInterpolatedElement(const float* const mat, const float x,
                                     const float y, const int width)
 {
@@ -53,17 +55,22 @@ inline float getInterpolatedElement(const float* const mat, const float x,
     float dxdy = dx*dy;
     const float* bp = mat +ix+iy*width;
 
-
-    float res =   dxdy * bp[1+width]
-                  + (dy-dxdy) * bp[width]
-                  + (dx-dxdy) * bp[1]
-                  + (1-dx-dy+dxdy) * bp[0];
+    float res = dxdy * bp[1+width]
+                + (dy-dxdy) * bp[width]
+                + (dx-dxdy) * bp[1]
+                + (1-dx-dy+dxdy) * bp[0];
 
     return res;
 }
 
-inline Eigen::Vector3f getInterpolatedElement43(const Eigen::Vector4f* const
-        mat, const float x, const float y, const int width)
+
+inline float getInterpolatedElement(const float* const mat, const Eigen::Vector2f p, const int width) {
+    return getInterpolatedElement(mat, p(0), p(1), width);
+}
+
+
+inline Eigen::Vector3f getInterpolatedElement43(const Eigen::Vector4f* const mat,
+                                                const float x, const float y, const int width)
 {
     int ix = (int)x;
     int iy = (int)y;
