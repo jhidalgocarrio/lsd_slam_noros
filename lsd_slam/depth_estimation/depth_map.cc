@@ -1657,36 +1657,28 @@ inline float DepthMap::doLineStereo(
 
     // calculate increments in which we will step through the epipolar line.
     // they are sampleDist (or half sample dist) long
-    float incx = pClose[0] - pFar[0];
-    float incy = pClose[1] - pFar[1];
-    float eplLength = sqrt(incx*incx+incy*incy);
+    Eigen::Vector2f inc = pClose - pFar;
+
+    float eplLength = inc.norm();
     if(!eplLength > 0 || std::isinf(eplLength)) return -4;
 
     if(eplLength > MAX_EPL_LENGTH_CROP)
     {
-        pClose[0] = pFar[0] + incx*MAX_EPL_LENGTH_CROP/eplLength;
-        pClose[1] = pFar[1] + incy*MAX_EPL_LENGTH_CROP/eplLength;
+        pClose = pFar + inc*MAX_EPL_LENGTH_CROP/eplLength;
     }
 
-    incx *= GRADIENT_SAMPLE_DIST/eplLength;
-    incy *= GRADIENT_SAMPLE_DIST/eplLength;
-
+    inc *= GRADIENT_SAMPLE_DIST/eplLength;
 
     // extend one sample_dist to left & right.
-    pFar[0] -= incx;
-    pFar[1] -= incy;
-    pClose[0] += incx;
-    pClose[1] += incy;
+    pFar -= inc;
+    pClose += inc;
 
     // make epl long enough (pad a little bit).
     if(eplLength < MIN_EPL_LENGTH_CROP)
     {
         float pad = (MIN_EPL_LENGTH_CROP - (eplLength)) / 2;
-        pFar[0] -= incx*pad;
-        pFar[1] -= incy*pad;
-
-        pClose[0] += incx*pad;
-        pClose[1] += incy*pad;
+        pFar -= inc*pad;
+        pClose += inc*pad;
     }
 
     // if inf point is outside of image: skip pixel.
@@ -1697,33 +1689,28 @@ inline float DepthMap::doLineStereo(
     }
 
     // if near point is outside: move inside, and test length again.
-
     if(!isInExclusiveImageRange(pClose, SAMPLE_POINT_TO_BORDER))
     {
-        if(pClose[0] <= SAMPLE_POINT_TO_BORDER)
+        if(pClose(0) <= SAMPLE_POINT_TO_BORDER)
         {
-            float toAdd = (SAMPLE_POINT_TO_BORDER - pClose[0]) / incx;
-            pClose[0] += toAdd * incx;
-            pClose[1] += toAdd * incy;
+            float toAdd = (SAMPLE_POINT_TO_BORDER - pClose(0)) / inc(0);
+            pClose += toAdd * inc;
         }
-        else if(pClose[0] >= width-SAMPLE_POINT_TO_BORDER)
+        else if(pClose(0) >= width-SAMPLE_POINT_TO_BORDER)
         {
-            float toAdd = (width-SAMPLE_POINT_TO_BORDER - pClose[0]) / incx;
-            pClose[0] += toAdd * incx;
-            pClose[1] += toAdd * incy;
+            float toAdd = (width-SAMPLE_POINT_TO_BORDER - pClose(0)) / inc(0);
+            pClose += toAdd * inc;
         }
 
-        if(pClose[1] <= SAMPLE_POINT_TO_BORDER)
+        if(pClose(1) <= SAMPLE_POINT_TO_BORDER)
         {
-            float toAdd = (SAMPLE_POINT_TO_BORDER - pClose[1]) / incy;
-            pClose[0] += toAdd * incx;
-            pClose[1] += toAdd * incy;
+            float toAdd = (SAMPLE_POINT_TO_BORDER - pClose(1)) / inc(1);
+            pClose += toAdd * inc;
         }
-        else if(pClose[1] >= height-SAMPLE_POINT_TO_BORDER)
+        else if(pClose(1) >= height-SAMPLE_POINT_TO_BORDER)
         {
-            float toAdd = (height-SAMPLE_POINT_TO_BORDER - pClose[1]) / incy;
-            pClose[0] += toAdd * incx;
-            pClose[1] += toAdd * incy;
+            float toAdd = (height-SAMPLE_POINT_TO_BORDER - pClose(1)) / inc(1);
+            pClose += toAdd * inc;
         }
 
         // get new epl length
@@ -1735,25 +1722,23 @@ inline float DepthMap::doLineStereo(
             if(enablePrintDebugInfo) stats->num_stereo_near_oob++;
             return -1;
         }
-
-
     }
 
 
     // from here on:
     // - pInf: search start-point
     // - p0: search end-point
-    // - incx, incy: search steps in pixel
+    // - inc(0), inc(1): search steps in pixel
     // - eplLength, min_idepth, max_idepth: determines search-resolution, i.e. the result's variance.
 
 
     float cpx = pFar[0];
     float cpy = pFar[1];
 
-    float val_cp_m2 = getInterpolatedElement(referenceFrameImage, cpx-2*incx, cpy-2*incy, width);
-    float val_cp_m1 = getInterpolatedElement(referenceFrameImage, cpx-incx, cpy-incy, width);
+    float val_cp_m2 = getInterpolatedElement(referenceFrameImage, cpx-2*inc(0), cpy-2*inc(1), width);
+    float val_cp_m1 = getInterpolatedElement(referenceFrameImage, cpx-inc(0), cpy-inc(1), width);
     float val_cp = getInterpolatedElement(referenceFrameImage, cpx, cpy, width);
-    float val_cp_p1 = getInterpolatedElement(referenceFrameImage, cpx+incx, cpy+incy, width);
+    float val_cp_p1 = getInterpolatedElement(referenceFrameImage, cpx+inc(0), cpy+inc(1), width);
     float val_cp_p2;
 
     /*
@@ -1795,11 +1780,11 @@ inline float DepthMap::doLineStereo(
           e5A=NAN, e5B=NAN;
 
     int loopCBest=-1, loopCSecond =-1;
-    while(((incx < 0) == (cpx > pClose[0]) && (incy < 0) == (cpy > pClose[1]))
+    while(((inc(0) < 0) == (cpx > pClose[0]) && (inc(1) < 0) == (cpy > pClose[1]))
             || loopCounter == 0)
     {
         // interpolate one new point
-        val_cp_p2 = getInterpolatedElement(referenceFrameImage, cpx+2*incx, cpy+2*incy,
+        val_cp_p2 = getInterpolatedElement(referenceFrameImage, cpx+2*inc(0), cpy+2*inc(1),
                                            width);
 
 
@@ -1885,8 +1870,8 @@ inline float DepthMap::doLineStereo(
 
         if(enablePrintDebugInfo) stats->num_stereo_comparisons++;
 
-        cpx += incx;
-        cpy += incy;
+        cpx += inc(0);
+        cpy += inc(1);
 
         loopCounter++;
     }
@@ -1969,8 +1954,8 @@ inline float DepthMap::doLineStereo(
         if(interpPre)
         {
             float d = gradPre_this / (gradPre_this - gradPre_pre);
-            best_match_x -= d*incx;
-            best_match_y -= d*incy;
+            best_match_x -= d*inc(0);
+            best_match_y -= d*inc(1);
             best_match_err = best_match_err - 2*d*gradPre_this - (gradPre_pre -
                              gradPre_this)*d*d;
             if(enablePrintDebugInfo) stats->num_stereo_interpPre++;
@@ -1980,8 +1965,8 @@ inline float DepthMap::doLineStereo(
         else if(interpPost)
         {
             float d = gradPost_this / (gradPost_this - gradPost_post);
-            best_match_x += d*incx;
-            best_match_y += d*incy;
+            best_match_x += d*inc(0);
+            best_match_y += d*inc(1);
             best_match_err = best_match_err + 2*d*gradPost_this + (gradPost_post -
                              gradPost_this)*d*d;
             if(enablePrintDebugInfo) stats->num_stereo_interpPost++;
@@ -2023,7 +2008,7 @@ inline float DepthMap::doLineStereo(
 
     float idnew_best_match;	// depth in the new image
     float alpha; // d(idnew_best_match) / d(disparity in pixel) == conputed inverse depth derived by the pixel-disparity.
-    if(incx*incx>incy*incy)
+    if(inc(0)*inc(0)>inc(1)*inc(1))
     {
         float oldX = fxi*best_match_x+cxi;
         float nominator = (oldX*referenceFrame->otherToThis_t[2] -
@@ -2032,7 +2017,7 @@ inline float DepthMap::doLineStereo(
         float dot2 = KinvP.dot(referenceFrame->otherToThis_R_row2);
 
         idnew_best_match = (dot0 - oldX*dot2) / nominator;
-        alpha = incx*fxi*(dot0*referenceFrame->otherToThis_t[2] -
+        alpha = inc(0)*fxi*(dot0*referenceFrame->otherToThis_t[2] -
                           dot2*referenceFrame->otherToThis_t[0]) / (nominator*nominator);
 
     }
@@ -2046,7 +2031,7 @@ inline float DepthMap::doLineStereo(
         float dot2 = KinvP.dot(referenceFrame->otherToThis_R_row2);
 
         idnew_best_match = (dot1 - oldY*dot2) / nominator;
-        alpha = incy*fyi*(dot1*referenceFrame->otherToThis_t[2] -
+        alpha = inc(1)*fyi*(dot1*referenceFrame->otherToThis_t[2] -
                           dot2*referenceFrame->otherToThis_t[1]) / (nominator*nominator);
 
     }
