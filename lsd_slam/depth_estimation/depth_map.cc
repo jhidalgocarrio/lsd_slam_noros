@@ -562,18 +562,17 @@ void DepthMap::propagateDepth(Frame* new_keyframe)
 
             float new_idepth = 1.0f / pn[2];
 
-            float u_new = pn[0]*new_idepth*focal_length(0) + offset(0);
-            float v_new = pn[1]*new_idepth*focal_length(1) + offset(1);
+            Eigen::Vector2f p = new_idepth * focal_length.cwiseProduct(pn.segment(0, 2)) + offset;
 
             // check if still within image, if not: DROP.
-            if(!(u_new > 2.1f && v_new > 2.1f && u_new < width-3.1f
-                    && v_new < height-3.1f))
+            if(!(p(0) > 2.1f && p(1) > 2.1f && p(0) < width-3.1f
+                    && p(1) < height-3.1f))
             {
                 if(enablePrintDebugInfo) runningStats.num_prop_removed_out_of_bounds++;
                 continue;
             }
 
-            int newIDX = (int)(u_new+0.5f) + ((int)(v_new+0.5f))*width;
+            int newIDX = (int)(p(0)+0.5f) + ((int)(p(1)+0.5f))*width;
             float destAbsGrad = newKFMaxGrad[newIDX];
 
             if(trackingWasGood != 0)
@@ -589,7 +588,7 @@ void DepthMap::propagateDepth(Frame* new_keyframe)
             else
             {
                 float sourceColor = activeKFImageData[x + y*width];
-                float destColor = getInterpolatedElement(newKFImageData, u_new, v_new, width);
+                float destColor = getInterpolatedElement(newKFImageData, p, width);
 
                 float residual = destColor - sourceColor;
 
