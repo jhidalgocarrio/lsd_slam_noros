@@ -1777,10 +1777,6 @@ float DepthMap::doLineStereo(
 
     float eeLast = -1; // final error of last comp.
 
-    // alternating intermediate vars
-    float e1A=NAN, e1B=NAN, e2A=NAN, e2B=NAN, e3A=NAN, e3B=NAN, e4A=NAN, e4B=NAN,
-          e5A=NAN, e5B=NAN;
-
     int arg_best=-1, arg_second_best =-1;
     while(((inc(0) < 0) == (cp(0) > pClose[0]) && (inc(1) < 0) == (cp(1) > pClose[1])) ||
           index == 0)
