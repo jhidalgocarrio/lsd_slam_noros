@@ -1584,6 +1584,11 @@ bool DepthMap::isInExclusiveImageRange(Eigen::Vector2f x, float margin) {
            isInExclusiveRange(x(1), margin, height-margin);
 }
 
+inline Eigen::VectorXf calcGrad(const Eigen::VectorXf &intensities) {
+    const int n = intensities.size() - 1;
+    return intensities.segment(1, n) - intensities.segment(0, n);
+}
+
 
 // find pixel in image (do stereo along epipolar line).
 // mat: NEW image
@@ -1952,20 +1957,12 @@ float DepthMap::doLineStereo(
     // sampleDist is the distance in pixel at which the realVal's were sampled
     float sampleDist = GRADIENT_SAMPLE_DIST*rescaleFactor;
 
-    float gradAlongLine = 0;
-    float tmp = realVal(4) - realVal(3);
-    gradAlongLine+=tmp*tmp;
-    tmp = realVal(3) - realVal(2);
-    gradAlongLine+=tmp*tmp;
-    tmp = realVal(2) - realVal(1);
-    gradAlongLine+=tmp*tmp;
-    tmp = realVal(1) - realVal(0);
-    gradAlongLine+=tmp*tmp;
-
+    Eigen::VectorXf grad = calcGrad(realVal);
+    float gradAlongLine = grad.dot(grad);
     gradAlongLine /= sampleDist*sampleDist;
 
     // check if interpolated error is OK. use evil hack to allow more error if there is a lot of gradient.
-    if(best_match_err > (float)MAX_ERROR_STEREO + sqrtf( gradAlongLine)*20)
+    if(best_match_err > (float)MAX_ERROR_STEREO + sqrtf(gradAlongLine)*20)
     {
         if(enablePrintDebugInfo) stats->num_stereo_invalid_bigErr++;
         return -3;
