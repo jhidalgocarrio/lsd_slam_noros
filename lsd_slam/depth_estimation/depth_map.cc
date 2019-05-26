@@ -1621,11 +1621,12 @@ float DepthMap::doLineStereo(
     }
 
     // calculate values to search for
-    float realVal_p2 = getInterpolatedElement(activeKeyFrameImageData, p + 2*epn*rescaleFactor, width);
-    float realVal_p1 = getInterpolatedElement(activeKeyFrameImageData, p + epn*rescaleFactor, width);
-    float realVal = getInterpolatedElement(activeKeyFrameImageData, p, width);
-    float realVal_m1 = getInterpolatedElement(activeKeyFrameImageData, p - epn*rescaleFactor, width);
-    float realVal_m2 = getInterpolatedElement(activeKeyFrameImageData, p - 2*epn*rescaleFactor, width);
+    Eigen::VectorXf realVal(5);
+    realVal(0) = getInterpolatedElement(activeKeyFrameImageData, p - 2*epn*rescaleFactor, width);
+    realVal(1) = getInterpolatedElement(activeKeyFrameImageData, p - epn*rescaleFactor, width);
+    realVal(2) = getInterpolatedElement(activeKeyFrameImageData, p, width);
+    realVal(3) = getInterpolatedElement(activeKeyFrameImageData, p + epn*rescaleFactor, width);
+    realVal(4) = getInterpolatedElement(activeKeyFrameImageData, p + 2*epn*rescaleFactor, width);
 
     Eigen::Vector3f PClose = pInf + referenceFrame->K_otherToThis_t*max_idepth;
     Eigen::Vector3f PFar = pInf + referenceFrame->K_otherToThis_t*min_idepth;
@@ -1733,11 +1734,11 @@ float DepthMap::doLineStereo(
 
     Eigen::Vector2f cp = pFar;
 
-    float val_cp_m2 = getInterpolatedElement(referenceFrameImage, cp-2*inc, width);
-    float val_cp_m1 = getInterpolatedElement(referenceFrameImage, cp-inc, width);
-    float val_cp = getInterpolatedElement(referenceFrameImage, cp, width);
-    float val_cp_p1 = getInterpolatedElement(referenceFrameImage, cp+inc, width);
-    float val_cp_p2;
+    Eigen::VectorXf val_cp(5);
+    val_cp(0) = getInterpolatedElement(referenceFrameImage, cp-2*inc, width);
+    val_cp(1) = getInterpolatedElement(referenceFrameImage, cp-inc, width);
+    val_cp(2) = getInterpolatedElement(referenceFrameImage, cp, width);
+    val_cp(3) = getInterpolatedElement(referenceFrameImage, cp+inc, width);
 
     /*
      * Subsequent exact minimum is found the following way:
@@ -1781,37 +1782,21 @@ float DepthMap::doLineStereo(
           loopCounter == 0)
     {
         // interpolate one new point
-        val_cp_p2 = getInterpolatedElement(referenceFrameImage, cp+2*inc, width);
+        val_cp(4) = getInterpolatedElement(referenceFrameImage, cp+2*inc, width);
 
         // hacky but fast way to get error and differential error: switch buffer variables for last loop.
         float ee = 0;
+        Eigen::VectorXf eA(5);
+        Eigen::VectorXf eB(5);
         if(loopCounter%2==0)
         {
-            // calc error and accumulate sums.
-            e1A = val_cp_p2 - realVal_p2;
-            ee += e1A*e1A;
-            e2A = val_cp_p1 - realVal_p1;
-            ee += e2A*e2A;
-            e3A = val_cp - realVal;
-            ee += e3A*e3A;
-            e4A = val_cp_m1 - realVal_m1;
-            ee += e4A*e4A;
-            e5A = val_cp_m2 - realVal_m2;
-            ee += e5A*e5A;
+            eA = val_cp - realVal;
+            ee += eA.dot(eA);
         }
         else
         {
-            // calc error and accumulate sums.
-            e1B = val_cp_p2 - realVal_p2;
-            ee += e1B*e1B;
-            e2B = val_cp_p1 - realVal_p1;
-            ee += e2B*e2B;
-            e3B = val_cp - realVal;
-            ee += e3B*e3B;
-            e4B = val_cp_m1 - realVal_m1;
-            ee += e4B*e4B;
-            e5B = val_cp_m2 - realVal_m2;
-            ee += e5B*e5B;
+            eB = val_cp - realVal;
+            ee += eB.dot(eB);
         }
 
 
@@ -1828,7 +1813,7 @@ float DepthMap::doLineStereo(
             loopCBest = loopCounter;
 
             best_match_errPre = eeLast;
-            best_match_DiffErrPre = e1A*e1B + e2A*e2B + e3A*e3B + e4A*e4B + e5A*e5B;
+            best_match_DiffErrPre = eA.dot(eB);
             best_match_errPost = -1;
             best_match_DiffErrPost = -1;
 
@@ -1841,7 +1826,7 @@ float DepthMap::doLineStereo(
             if(bestWasLastLoop)
             {
                 best_match_errPost = ee;
-                best_match_DiffErrPost = e1A*e1B + e2A*e2B + e3A*e3B + e4A*e4B + e5A*e5B;
+                best_match_DiffErrPost = eA.dot(eB);
                 bestWasLastLoop = false;
             }
 
@@ -1857,10 +1842,7 @@ float DepthMap::doLineStereo(
 
         // shift everything one further.
         eeLast = ee;
-        val_cp_m2 = val_cp_m1;
-        val_cp_m1 = val_cp;
-        val_cp = val_cp_p1;
-        val_cp_p1 = val_cp_p2;
+        val_cp.segment(0, 4) = val_cp.segment(1, 4);
 
         if(enablePrintDebugInfo) stats->num_stereo_comparisons++;
 
@@ -1974,13 +1956,13 @@ float DepthMap::doLineStereo(
     float sampleDist = GRADIENT_SAMPLE_DIST*rescaleFactor;
 
     float gradAlongLine = 0;
-    float tmp = realVal_p2 - realVal_p1;
+    float tmp = realVal(4) - realVal(3);
     gradAlongLine+=tmp*tmp;
-    tmp = realVal_p1 - realVal;
+    tmp = realVal(3) - realVal(2);
     gradAlongLine+=tmp*tmp;
-    tmp = realVal - realVal_m1;
+    tmp = realVal(2) - realVal(1);
     gradAlongLine+=tmp*tmp;
-    tmp = realVal_m1 - realVal_m2;
+    tmp = realVal(1) - realVal(0);
     gradAlongLine+=tmp*tmp;
 
     gradAlongLine /= sampleDist*sampleDist;
