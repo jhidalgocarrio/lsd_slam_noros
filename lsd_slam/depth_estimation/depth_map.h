@@ -106,7 +106,9 @@ public:
 private:
     // camera matrix etc.
     Eigen::Matrix3f K, KInv;
-    float fx,fy,cx,cy;
+    Eigen::Vector2f focal_length, offset;
+    float fx,fy;
+
     float fxi,fyi,cxi,cyi;
     int width, height;
 
@@ -152,8 +154,8 @@ private:
     bool observeDepthCreate(const Eigen::Vector2i &p, const int &idx, RunningStats* const &stats);
     bool observeDepthUpdate(const Eigen::Vector2i &p, const int &idx,
                             const float* keyFrameMaxGradBuf, RunningStats* const &stats);
-    bool makeAndCheckEPL(const int x, const int y, const Frame* const ref,
-                         float* pepx, float* pepy, RunningStats* const stats);
+    bool makeAndCheckEPL(const Eigen::Vector2f &p,
+                         const Frame* const ref, float* pepx, float* pepy, RunningStats* const stats);
 
 
     void regularizeDepthMap(bool removeOcclusion, int validityTH);

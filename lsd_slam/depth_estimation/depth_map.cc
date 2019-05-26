@@ -55,10 +55,8 @@ DepthMap::DepthMap(int w, int h, const Eigen::Matrix3f& K)
     debugImageDepth = cv::Mat(h,w, CV_8UC3);
 
     this->K = K;
-    fx = K(0,0);
-    fy = K(1,1);
-    cx = K(0,2);
-    cy = K(1,2);
+    focal_length << K(0,0), K(1,1);
+    offset = K.block(0, 2, 2, 1);
 
     KInv = K.inverse();
     fxi = KInv(0,0);
@@ -177,19 +175,16 @@ void DepthMap::observeDepth()
 }
 
 
-
-
-
-bool DepthMap::makeAndCheckEPL(const int x, const int y,
+bool DepthMap::makeAndCheckEPL(const Eigen::Vector2f &p,
                                const Frame* const ref, float* pepx, float* pepy, RunningStats* const stats)
 {
-    int idx = x+y*width;
+    int idx = p(0) + p(1)*width;
 
     // ======= make epl ========
-    // calculate the plane spanned by the two camera centers and the point (x,y,1)
+    // calculate the plane spanned by the two camera centers and the point (p(0),p(1),1)
     // intersect it with the keyframe's image plane (at depth=1)
-    float epx = - fx * ref->thisToOther_t[0] + ref->thisToOther_t[2]*(x - cx);
-    float epy = - fy * ref->thisToOther_t[1] + ref->thisToOther_t[2]*(y - cy);
+    float epx = - focal_length(0) * ref->thisToOther_t[0] + ref->thisToOther_t[2]*(p(0) - offset(0));
+    float epy = - focal_length(1) * ref->thisToOther_t[1] + ref->thisToOther_t[2]*(p(1) - offset(1));
 
     if(std::isnan(epx+epy))
         return false;
@@ -261,13 +256,11 @@ bool DepthMap::observeDepthCreate(const Eigen::Vector2i &p, const int &idx,
     }
 
     Eigen::Vector2f epn;
-    bool isGood = makeAndCheckEPL(p(0), p(1), refFrame, &epn(0), &epn(1), stats);
+    bool isGood = makeAndCheckEPL(p.cast<float>(), refFrame, &epn(0), &epn(1), stats);
     if(!isGood) return false;
 
     if(enablePrintDebugInfo) stats->num_observe_create_attempted++;
 
-    float new_u = p(0);
-    float new_v = p(1);
     float result_idepth, result_var, result_eplLength;
 
     float error = doLineStereo(
@@ -347,7 +340,7 @@ bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &p, const int &idx,
     }
 
     Eigen::Vector2f epn;
-    bool isGood = makeAndCheckEPL(p(0), p(1), refFrame, &epn(0), &epn(1), stats);
+    bool isGood = makeAndCheckEPL(p.cast<float>(), refFrame, &epn(0), &epn(1), stats);
     if(!isGood) return false;
 
     // which exact point to track, and where from.
@@ -568,8 +561,8 @@ void DepthMap::propagateDepth(Frame* new_keyframe)
 
             float new_idepth = 1.0f / pn[2];
 
-            float u_new = pn[0]*new_idepth*fx + cx;
-            float v_new = pn[1]*new_idepth*fy + cy;
+            float u_new = pn[0]*new_idepth*focal_length(0) + offset(0);
+            float v_new = pn[1]*new_idepth*focal_length(1) + offset(1);
 
             // check if still within image, if not: DROP.
             if(!(u_new > 2.1f && v_new > 2.1f && u_new < width-3.1f
