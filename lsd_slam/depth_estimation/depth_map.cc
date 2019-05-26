@@ -1761,7 +1761,7 @@ float DepthMap::doLineStereo(
 
 
     // walk in equally sized steps, starting at depth=infinity.
-    int loopCounter = 0;
+    int index = 0;
     Eigen::Vector2f best_match;
     float best_match_err = 1e50;
     float second_best_match_err = 1e50;
@@ -1777,9 +1777,9 @@ float DepthMap::doLineStereo(
     float e1A=NAN, e1B=NAN, e2A=NAN, e2B=NAN, e3A=NAN, e3B=NAN, e4A=NAN, e4B=NAN,
           e5A=NAN, e5B=NAN;
 
-    int loopCBest=-1, loopCSecond =-1;
+    int arg_best=-1, arg_second_best =-1;
     while(((inc(0) < 0) == (cp(0) > pClose[0]) && (inc(1) < 0) == (cp(1) > pClose[1])) ||
-          loopCounter == 0)
+          index == 0)
     {
         // interpolate one new point
         val_cp(4) = getInterpolatedElement(referenceFrameImage, cp+2*inc, width);
@@ -1788,7 +1788,7 @@ float DepthMap::doLineStereo(
         float ee = 0;
         Eigen::VectorXf eA(5);
         Eigen::VectorXf eB(5);
-        if(loopCounter%2==0)
+        if(index%2==0)
         {
             eA = val_cp - realVal;
             ee += eA.dot(eA);
@@ -1806,11 +1806,11 @@ float DepthMap::doLineStereo(
         {
             // put to second-best
             second_best_match_err=best_match_err;
-            loopCSecond = loopCBest;
+            arg_second_best = arg_best;
 
             // set best.
             best_match_err = ee;
-            loopCBest = loopCounter;
+            arg_best = index;
 
             best_match_errPre = eeLast;
             best_match_DiffErrPre = eA.dot(eB);
@@ -1835,7 +1835,7 @@ float DepthMap::doLineStereo(
             if(ee < second_best_match_err)
             {
                 second_best_match_err=ee;
-                loopCSecond = loopCounter;
+                arg_second_best = index;
             }
         }
 
@@ -1848,7 +1848,7 @@ float DepthMap::doLineStereo(
 
         cp += inc;
 
-        loopCounter++;
+        index++;
     }
 
     // if error too big, will return -3, otherwise -2.
@@ -1860,7 +1860,7 @@ float DepthMap::doLineStereo(
 
 
     // check if clear enough winner
-    if(abs(loopCBest - loopCSecond) > 1 &&
+    if(abs(arg_best - arg_second_best) > 1 &&
            MIN_DISTANCE_ERROR_STEREO * best_match_err > second_best_match_err)
     {
         if(enablePrintDebugInfo) stats->num_stereo_invalid_unclear_winner++;
