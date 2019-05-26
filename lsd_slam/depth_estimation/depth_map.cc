@@ -1772,8 +1772,8 @@ float DepthMap::doLineStereo(
     float second_best_match_err = 1e50;
 
     // best pre and post errors.
-    float best_match_errPre=NAN, best_match_errPost=NAN, best_match_DiffErrPre=NAN,
-          best_match_DiffErrPost=NAN;
+    float best_match_err_pre=NAN, best_match_err_post=NAN;
+    float best_match_diff_error_pre=NAN, best_match_diff_error_post=NAN;
 
     float eeLast = -1; // final error of last comp.
 
@@ -1812,10 +1812,10 @@ float DepthMap::doLineStereo(
             best_match_err = ee;
             arg_best = index;
 
-            best_match_errPre = eeLast;
-            best_match_DiffErrPre = eA.dot(eB);
-            best_match_errPost = -1;
-            best_match_DiffErrPost = -1;
+            best_match_err_pre = eeLast;
+            best_match_err_post = -1;
+            best_match_diff_error_pre = eA.dot(eB);
+            best_match_diff_error_post = -1;
 
             best_match = cp;
         }
@@ -1824,8 +1824,8 @@ float DepthMap::doLineStereo(
         {
             if(index == arg_best + 1)
             {
-                best_match_errPost = ee;
-                best_match_DiffErrPost = eA.dot(eB);
+                best_match_err_post = ee;
+                best_match_diff_error_post = eA.dot(eB);
             }
 
             // collect second-best:
@@ -1870,17 +1870,17 @@ float DepthMap::doLineStereo(
     {
         // ================== compute exact match =========================
         // compute gradients (they are actually only half the real gradient)
-        float gradPre_pre = -(best_match_errPre - best_match_DiffErrPre);
-        float gradPre_this = +(best_match_err - best_match_DiffErrPre);
-        float gradPost_this = -(best_match_err - best_match_DiffErrPost);
-        float gradPost_post = +(best_match_errPost - best_match_DiffErrPost);
+        float gradPre_pre = -(best_match_err_pre - best_match_diff_error_pre);
+        float gradPre_this = +(best_match_err - best_match_diff_error_pre);
+        float gradPost_this = -(best_match_err - best_match_diff_error_post);
+        float gradPost_post = +(best_match_err_post - best_match_diff_error_post);
 
         // final decisions here.
         bool interpPost = false;
         bool interpPre = false;
 
         // if one is oob: return false.
-        if(enablePrintDebugInfo && (best_match_errPre < 0 || best_match_errPost < 0))
+        if(enablePrintDebugInfo && (best_match_err_pre < 0 || best_match_err_post < 0))
         {
             stats->num_stereo_invalid_atEnd++;
         }
