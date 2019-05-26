@@ -130,30 +130,27 @@ private:
     DepthMapPixelHypothesis* currentDepthMap;
     int* validityIntegralBuffer;
 
-
-
-    bool isIn2Sigma(float u, float v, float epxn, float epyn, float rescaleFactor);
+    bool isIn2Sigma(const Eigen::Vector2f &p, const Eigen::Vector2f &epn, const float rescaleFactor);
     bool isInExclusiveImageRange(Eigen::Vector2f x, float margin=0);
 
     // ============ internal functions ==================================================
     // does the line-stereo seeking.
     // takes a lot of parameters, because they all have been pre-computed before.
-    inline float doLineStereo(
-        const float u, const float v, const float epxn, const float epyn,
+    //
+    float doLineStereo(
+        const Eigen::Vector2f &p, const Eigen::Vector2f epn,
         const float min_idepth, const float prior_idepth, float max_idepth,
         const Frame* const referenceFrame, const float* referenceFrameImage,
         float &result_idepth, float &result_var, float &result_eplLength,
-        RunningStats* const stats);
-
+        RunningStats* stats);
 
     void propagateDepth(Frame* new_keyframe);
 
-
     void observeDepth();
     void observeDepthRow(int yMin, int yMax, RunningStats* stats);
-    bool observeDepthCreate(const int &x, const int &y, const int &idx,
-                            RunningStats* const &stats);
-    bool observeDepthUpdate(const int &x, const int &y, const int &idx,
+
+    bool observeDepthCreate(const Eigen::Vector2i &p, const int &idx, RunningStats* const &stats);
+    bool observeDepthUpdate(const Eigen::Vector2i &p, const int &idx,
                             const float* keyFrameMaxGradBuf, RunningStats* const &stats);
     bool makeAndCheckEPL(const int x, const int y, const Frame* const ref,
                          float* pepx, float* pepy, RunningStats* const stats);

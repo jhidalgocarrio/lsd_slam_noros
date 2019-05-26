@@ -127,12 +127,14 @@ void DepthMap::observeDepthRow(int yMin, int yMax, RunningStats* stats)
                     || target->blacklisted < MIN_BLACKLIST)
                 continue;
 
+            Eigen::Vector2i p;
+            p << x, y;
 
             bool success;
             if(!hasHypothesis)
-                success = observeDepthCreate(x, y, idx, stats);
+                success = observeDepthCreate(p, idx, stats);
             else
-                success = observeDepthUpdate(x, y, idx, keyFrameMaxGradBuf, stats);
+                success = observeDepthUpdate(p, idx, keyFrameMaxGradBuf, stats);
 
             if(success)
                 successes++;
@@ -233,7 +235,7 @@ bool DepthMap::makeAndCheckEPL(const int x, const int y,
 }
 
 
-bool DepthMap::observeDepthCreate(const int &x, const int &y, const int &idx,
+bool DepthMap::observeDepthCreate(const Eigen::Vector2i &p, const int &idx,
                                   RunningStats* const &stats)
 {
     DepthMapPixelHypothesis* target = currentDepthMap+idx;
@@ -245,27 +247,31 @@ bool DepthMap::observeDepthCreate(const int &x, const int &y, const int &idx,
     {
         bool* wasGoodDuringTracking = refFrame->refPixelWasGoodNoCreate();
         if(wasGoodDuringTracking != 0 &&
-           !wasGoodDuringTracking[(x >> SE3TRACKING_MIN_LEVEL) + (width >> SE3TRACKING_MIN_LEVEL)*(y >> SE3TRACKING_MIN_LEVEL)])
+           !wasGoodDuringTracking[
+            (p(0) >> SE3TRACKING_MIN_LEVEL) +
+            (width >> SE3TRACKING_MIN_LEVEL)*(p(1) >> SE3TRACKING_MIN_LEVEL)
+           ])
         {
             if(plotStereoImages) {
                 // BLUE for SKIPPED NOT GOOD TRACKED
-                debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(255,0,0);
+                debugImageHypothesisHandling.at<cv::Vec3b>(p(1), p(0)) = cv::Vec3b(255,0,0);
             }
             return false;
         }
     }
 
-    float epx, epy;
-    bool isGood = makeAndCheckEPL(x, y, refFrame, &epx, &epy, stats);
+    Eigen::Vector2f epn;
+    bool isGood = makeAndCheckEPL(p(0), p(1), refFrame, &epn(0), &epn(1), stats);
     if(!isGood) return false;
 
     if(enablePrintDebugInfo) stats->num_observe_create_attempted++;
 
-    float new_u = x;
-    float new_v = y;
+    float new_u = p(0);
+    float new_v = p(1);
     float result_idepth, result_var, result_eplLength;
+
     float error = doLineStereo(
-                      new_u,new_v,epx,epy,
+                      p.cast<float>(), epn,
                       0.0f, 1.0f, 1.0f/MIN_DEPTH,
                       refFrame, refFrame->image(0),
                       result_idepth, result_var, result_eplLength, stats);
@@ -288,15 +294,14 @@ bool DepthMap::observeDepthCreate(const int &x, const int &y, const int &idx,
                   VALIDITY_COUNTER_INITIAL_OBSERVE);
 
     if(plotStereoImages)
-        debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(255,255,
-                255); // white for GOT CREATED
+        debugImageHypothesisHandling.at<cv::Vec3b>(p(1), p(0)) = cv::Vec3b(255,255,255); // white for GOT CREATED
 
     if(enablePrintDebugInfo) stats->num_observe_created++;
 
     return true;
 }
 
-bool DepthMap::observeDepthUpdate(const int &x, const int &y, const int &idx,
+bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &p, const int &idx,
                                   const float* keyFrameMaxGradBuf, RunningStats* const &stats)
 {
     DepthMapPixelHypothesis* target = currentDepthMap+idx;
@@ -309,7 +314,7 @@ bool DepthMap::observeDepthUpdate(const int &x, const int &y, const int &idx,
                 (int)referenceFrameByID.size())
         {
             if(plotStereoImages)
-                debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(0,255,
+                debugImageHypothesisHandling.at<cv::Vec3b>(p(1), p(0)) = cv::Vec3b(0,255,
                         0);	// GREEN FOR skip
 
             if(enablePrintDebugInfo) stats->num_observe_skip_alreadyGood++;
@@ -328,19 +333,21 @@ bool DepthMap::observeDepthUpdate(const int &x, const int &y, const int &idx,
     if(refFrame->getTrackingParent() == activeKeyFrame)
     {
         bool* wasGoodDuringTracking = refFrame->refPixelWasGoodNoCreate();
-        if(wasGoodDuringTracking != 0
-                && !wasGoodDuringTracking[(x >> SE3TRACKING_MIN_LEVEL) +
-                                                                       (width >> SE3TRACKING_MIN_LEVEL)*(y >> SE3TRACKING_MIN_LEVEL)])
+        if(wasGoodDuringTracking != 0 &&
+           !wasGoodDuringTracking[
+               (p(0) >> SE3TRACKING_MIN_LEVEL) +
+               (width >> SE3TRACKING_MIN_LEVEL)*(p(1) >> SE3TRACKING_MIN_LEVEL)
+           ])
         {
             if(plotStereoImages)
-                debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(255,0,
+                debugImageHypothesisHandling.at<cv::Vec3b>(p(1), p(0)) = cv::Vec3b(255,0,
                         0); // BLUE for SKIPPED NOT GOOD TRACKED
             return false;
         }
     }
 
-    float epx, epy;
-    bool isGood = makeAndCheckEPL(x, y, refFrame, &epx, &epy, stats);
+    Eigen::Vector2f epn;
+    bool isGood = makeAndCheckEPL(p(0), p(1), refFrame, &epn(0), &epn(1), stats);
     if(!isGood) return false;
 
     // which exact point to track, and where from.
@@ -355,7 +362,7 @@ bool DepthMap::observeDepthUpdate(const int &x, const int &y, const int &idx,
     float result_idepth, result_var, result_eplLength;
 
     float error = doLineStereo(
-                      x,y,epx,epy,
+                      p.cast<float>(), epn,
                       min_idepth, target->idepth_smoothed,max_idepth,
                       refFrame, refFrame->image(0),
                       result_idepth, result_var, result_eplLength, stats);
@@ -369,9 +376,10 @@ bool DepthMap::observeDepthUpdate(const int &x, const int &y, const int &idx,
         // do nothing, pixel got oob, but is still in bounds in original. I will want to try again.
         if(enablePrintDebugInfo) stats->num_observe_skip_oob++;
 
-        if(plotStereoImages)
-            debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(0,0,
-                    255);	// RED FOR OOB
+        if(plotStereoImages) {
+            // RED FOR OOB
+            debugImageHypothesisHandling.at<cv::Vec3b>(p(1), p(0)) = cv::Vec3b(0,0,255);
+        }
         return false;
     }
 
@@ -380,9 +388,10 @@ bool DepthMap::observeDepthUpdate(const int &x, const int &y, const int &idx,
     {
         if(enablePrintDebugInfo) stats->num_observe_skip_fail++;
 
-        if(plotStereoImages)
-            debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(255,0,
-                    255);	// PURPLE FOR NON-GOOD
+        if(plotStereoImages) {
+            // PURPLE FOR NON-GOOD
+            debugImageHypothesisHandling.at<cv::Vec3b>(p(1), p(0)) = cv::Vec3b(255,0,255);
+        }
 
 
         target->validity_counter -= VALIDITY_COUNTER_DEC;
@@ -404,9 +413,10 @@ bool DepthMap::observeDepthUpdate(const int &x, const int &y, const int &idx,
     else if(error == -3)
     {
         if(enablePrintDebugInfo) stats->num_observe_notfound++;
-        if(plotStereoImages)
-            debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(0,0,
-                    0);	// BLACK FOR big not-found
+        if(plotStereoImages) {
+            // BLACK FOR big not-found
+            debugImageHypothesisHandling.at<cv::Vec3b>(p(1), p(0)) = cv::Vec3b(0,0,0);
+        }
 
 
         return false;
@@ -414,9 +424,10 @@ bool DepthMap::observeDepthUpdate(const int &x, const int &y, const int &idx,
 
     else if(error == -4)
     {
-        if(plotStereoImages)
-            debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(0,0,
-                    0);	// BLACK FOR big arithmetic error
+        if(plotStereoImages) {
+            // BLACK FOR big arithmetic error
+            debugImageHypothesisHandling.at<cv::Vec3b>(p(1), p(0)) = cv::Vec3b(0,0,0);
+        }
 
         return false;
     }
@@ -425,9 +436,10 @@ bool DepthMap::observeDepthUpdate(const int &x, const int &y, const int &idx,
     else if(DIFF_FAC_OBSERVE*diff*diff > result_var + target->idepth_var_smoothed)
     {
         if(enablePrintDebugInfo) stats->num_observe_inconsistent++;
-        if(plotStereoImages)
-            debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(255,255,
-                    0);	// Turkoise FOR big inconsistent
+        if(plotStereoImages) {
+            // Turkoise FOR big inconsistent
+            debugImageHypothesisHandling.at<cv::Vec3b>(p(1), p(0)) = cv::Vec3b(255,255,0);
+        }
 
         target->idepth_var *= FAIL_VAR_INC_FAC;
         if(target->idepth_var > MAX_VAR) target->isValid = false;
@@ -484,10 +496,10 @@ bool DepthMap::observeDepthUpdate(const int &x, const int &y, const int &idx,
             target->nextStereoFrameMinID = refFrame->id() + inc;
         }
 
-        if(plotStereoImages)
-            debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(0,255,
-                    255); // yellow for GOT UPDATED
-
+        if(plotStereoImages) {
+            // yellow for GOT UPDATED
+            debugImageHypothesisHandling.at<cv::Vec3b>(p(1), p(0)) = cv::Vec3b(0,255,255);
+        }
         return true;
     }
 }
@@ -1565,14 +1577,12 @@ bool isInExclusiveRange(float x, float low, float high) {
 }
 
 
-bool DepthMap::isIn2Sigma(float u, float v, float epxn, float epyn, float rescaleFactor) {
-    float xn = u - 2*epxn*rescaleFactor;
-    float yn = v - 2*epyn*rescaleFactor;
-    float xp = u + 2*epxn*rescaleFactor;
-    float yp = v + 2*epyn*rescaleFactor;
+bool DepthMap::isIn2Sigma(const Eigen::Vector2f &p, const Eigen::Vector2f &epn, const float rescaleFactor) {
+    const Eigen::Vector2f L = p - 2*epn*rescaleFactor;
+    const Eigen::Vector2f H = p + 2*epn*rescaleFactor;
     // width - 2 and height - 2 comes from the one-sided gradient calculation at the bottom
-    return 0 < xn && xn < width - 2 && 0 < yn && yn < height - 2 &&
-           0 < xp && xp < width - 2 && 0 < yp && yp < height - 2;
+    return 0 < L(0) && L(0) < width - 2 && 0 < L(1) && L(1) < height - 2 &&
+           0 < H(0) && H(0) < width - 2 && 0 < H(1) && H(1) < height - 2;
 }
 
 
@@ -1588,11 +1598,11 @@ bool DepthMap::isInExclusiveImageRange(Eigen::Vector2f x, float margin) {
 // trafo: x_old = trafo * x_new; (from new to old image)
 // realVal: descriptor in OLD image.
 // returns: result_idepth : point depth in new camera's coordinate system
-// returns: result_u/v : point's coordinates in new camera's coordinate system
+// returns: result_u/p(1) : point's coordinates in new camera's coordinate system
 // returns: idepth_var: (approximated) measurement variance of inverse depth of result_point_NEW
 // returns error if sucessful; -1 if out of bounds, -2 if not found.
-inline float DepthMap::doLineStereo(
-    const float u, const float v, const float epxn, const float epyn,
+float DepthMap::doLineStereo(
+    const Eigen::Vector2f &p, const Eigen::Vector2f epn,
     const float min_idepth, const float prior_idepth, float max_idepth,
     const Frame* const referenceFrame, const float* referenceFrameImage,
     float &result_idepth, float &result_var, float &result_eplLength,
@@ -1601,13 +1611,13 @@ inline float DepthMap::doLineStereo(
     if(enablePrintDebugInfo) stats->num_stereo_calls++;
 
     // calculate epipolar line start and end point in old image
-    Eigen::Vector3f KinvP = Eigen::Vector3f(fxi*u+cxi,fyi*v+cyi,1);
+    Eigen::Vector3f KinvP = Eigen::Vector3f(fxi*p(0)+cxi,fyi*p(1)+cyi,1);
     Eigen::Vector3f pInf = referenceFrame->K_otherToThis_R * KinvP;
     Eigen::Vector3f pReal = pInf / prior_idepth + referenceFrame->K_otherToThis_t;
 
-    float rescaleFactor = pReal[2] * prior_idepth;
+    float rescaleFactor = pReal(2) * prior_idepth;
 
-    if(!isIn2Sigma(u, v, epxn, epyn, rescaleFactor)) {
+    if(!isIn2Sigma(p, epn, rescaleFactor)) {
         return -1;
     }
 
@@ -1618,15 +1628,11 @@ inline float DepthMap::doLineStereo(
     }
 
     // calculate values to search for
-    float realVal_p2 = getInterpolatedElement(activeKeyFrameImageData,
-                       u + 2*epxn*rescaleFactor, v + 2*epyn*rescaleFactor, width);
-    float realVal_p1 = getInterpolatedElement(activeKeyFrameImageData,
-                       u + epxn*rescaleFactor, v + epyn*rescaleFactor, width);
-    float realVal = getInterpolatedElement(activeKeyFrameImageData,u, v, width);
-    float realVal_m1 = getInterpolatedElement(activeKeyFrameImageData,
-                       u - epxn*rescaleFactor, v - epyn*rescaleFactor, width);
-    float realVal_m2 = getInterpolatedElement(activeKeyFrameImageData,
-                       u - 2*epxn*rescaleFactor, v - 2*epyn*rescaleFactor, width);
+    float realVal_p2 = getInterpolatedElement(activeKeyFrameImageData, p + 2*epn*rescaleFactor, width);
+    float realVal_p1 = getInterpolatedElement(activeKeyFrameImageData, p + epn*rescaleFactor, width);
+    float realVal = getInterpolatedElement(activeKeyFrameImageData, p, width);
+    float realVal_m1 = getInterpolatedElement(activeKeyFrameImageData, p - epn*rescaleFactor, width);
+    float realVal_m2 = getInterpolatedElement(activeKeyFrameImageData, p - 2*epn*rescaleFactor, width);
 
     Eigen::Vector3f PClose = pInf + referenceFrame->K_otherToThis_t*max_idepth;
     Eigen::Vector3f PFar = pInf + referenceFrame->K_otherToThis_t*min_idepth;
@@ -2045,12 +2051,9 @@ inline float DepthMap::doLineStereo(
     float trackingErrorFac = 0.25*(1+referenceFrame->initialTrackedResidual);
 
     // calculate error from geometric noise (wrong camera pose / calibration)
-    Eigen::Vector2f gradsInterp = getInterpolatedElement42(
-                                      activeKeyFrame->gradients(0), u, v, width);
-    float geoDispError = (gradsInterp[0]*epxn + gradsInterp[1]*epyn) +
-                         DIVISION_EPS;
-    geoDispError = trackingErrorFac*trackingErrorFac*(gradsInterp[0]*gradsInterp[0]
-                   + gradsInterp[1]*gradsInterp[1]) / (geoDispError*geoDispError);
+    Eigen::Vector2f gradsInterp = getInterpolatedElement42(activeKeyFrame->gradients(0), p, width);
+    float geoDispError = gradsInterp.dot(epn) + DIVISION_EPS;
+    geoDispError = trackingErrorFac*trackingErrorFac*gradsInterp.dot(gradsInterp) / (geoDispError*geoDispError);
 
 
     //geoDispError *= (0.5 + 0.5 *result_idepth) * (0.5 + 0.5 *result_idepth);

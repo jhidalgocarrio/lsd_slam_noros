@@ -86,8 +86,8 @@ inline Eigen::Vector3f getInterpolatedElement43(const Eigen::Vector4f* const mat
            + (1-dx-dy+dxdy) * *(const Eigen::Vector3f*)(bp);
 }
 
-inline Eigen::Vector4f getInterpolatedElement44(const Eigen::Vector4f* const
-        mat, const float x, const float y, const int width)
+inline Eigen::Vector4f getInterpolatedElement44(const Eigen::Vector4f* const mat,
+                                                const float x, const float y, const int width)
 {
     int ix = (int)x;
     int iy = (int)y;
@@ -95,7 +95,6 @@ inline Eigen::Vector4f getInterpolatedElement44(const Eigen::Vector4f* const
     float dy = y - iy;
     float dxdy = dx*dy;
     const Eigen::Vector4f* bp = mat +ix+iy*width;
-
 
     return dxdy * *(bp+1+width)
            + (dy-dxdy) * *(bp+width)
@@ -103,8 +102,8 @@ inline Eigen::Vector4f getInterpolatedElement44(const Eigen::Vector4f* const
            + (1-dx-dy+dxdy) * *(bp);
 }
 
-inline Eigen::Vector2f getInterpolatedElement42(const Eigen::Vector4f* const
-        mat, const float x, const float y, const int width)
+inline Eigen::Vector2f getInterpolatedElement42(const Eigen::Vector4f* const mat,
+                                                const float x, const float y, const int width)
 {
     int ix = (int)x;
     int iy = (int)y;
@@ -113,12 +112,17 @@ inline Eigen::Vector2f getInterpolatedElement42(const Eigen::Vector4f* const
     float dxdy = dx*dy;
     const Eigen::Vector4f* bp = mat +ix+iy*width;
 
-
     return dxdy * *(const Eigen::Vector2f*)(bp+1+width)
            + (dy-dxdy) * *(const Eigen::Vector2f*)(bp+width)
            + (dx-dxdy) * *(const Eigen::Vector2f*)(bp+1)
            + (1-dx-dy+dxdy) * *(const Eigen::Vector2f*)(bp);
 }
+
+inline Eigen::Vector2f getInterpolatedElement42(const Eigen::Vector4f* const mat,
+                                                const Eigen::Vector2f &p, const int width) {
+    return getInterpolatedElement42(mat, p(0), p(1), width);
+}
+
 inline void fillCvMat(cv::Mat* mat, cv::Vec3b color)
 {
     for(int y=0; y<mat->size().height; y++)
