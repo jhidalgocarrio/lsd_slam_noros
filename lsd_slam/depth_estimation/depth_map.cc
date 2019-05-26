@@ -1769,7 +1769,6 @@ float DepthMap::doLineStereo(
     // best pre and post errors.
     float best_match_errPre=NAN, best_match_errPost=NAN, best_match_DiffErrPre=NAN,
           best_match_DiffErrPost=NAN;
-    bool bestWasLastLoop = false;
 
     float eeLast = -1; // final error of last comp.
 
@@ -1818,16 +1817,14 @@ float DepthMap::doLineStereo(
             best_match_DiffErrPost = -1;
 
             best_match = cp;
-            bestWasLastLoop = true;
         }
         // otherwise: the last might be the current winner, in which case i have to save these values.
         else
         {
-            if(bestWasLastLoop)
+            if(index == arg_best + 1)
             {
                 best_match_errPost = ee;
                 best_match_DiffErrPost = eA.dot(eB);
-                bestWasLastLoop = false;
             }
 
             // collect second-best:
