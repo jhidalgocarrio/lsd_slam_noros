@@ -154,9 +154,8 @@ private:
     bool observeDepthCreate(const Eigen::Vector2i &p, const int &idx, RunningStats* const &stats);
     bool observeDepthUpdate(const Eigen::Vector2i &p, const int &idx,
                             const float* keyFrameMaxGradBuf, RunningStats* const &stats);
-    bool makeAndCheckEPL(const Eigen::Vector2f &p,
-                         const Frame* const ref, float* pepx, float* pepy, RunningStats* const stats);
-
+    bool makeAndCheckEPL(const Eigen::Vector2f &p, const Frame* const ref,
+                         Eigen::Vector2f &pep, RunningStats* const stats);
 
     void regularizeDepthMap(bool removeOcclusion, int validityTH);
     template<bool removeOcclusions> void regularizeDepthMapRow(int validityTH,

@@ -175,23 +175,23 @@ void DepthMap::observeDepth()
 }
 
 
-bool DepthMap::makeAndCheckEPL(const Eigen::Vector2f &p,
-                               const Frame* const ref, float* pepx, float* pepy, RunningStats* const stats)
+bool DepthMap::makeAndCheckEPL(const Eigen::Vector2f &p, const Frame* const ref,
+                               Eigen::Vector2f &pep, RunningStats* const stats)
 {
     int idx = p(0) + p(1)*width;
 
     // ======= make epl ========
     // calculate the plane spanned by the two camera centers and the point (p(0),p(1),1)
     // intersect it with the keyframe's image plane (at depth=1)
-    float epx = - focal_length(0) * ref->thisToOther_t[0] + ref->thisToOther_t[2]*(p(0) - offset(0));
-    float epy = - focal_length(1) * ref->thisToOther_t[1] + ref->thisToOther_t[2]*(p(1) - offset(1));
+    Eigen::Vector2f epn = - focal_length.cwiseProduct(ref->thisToOther_t.segment(0, 2))
+                        + ref->thisToOther_t[2]*(p - offset);
 
-    if(std::isnan(epx+epy))
+    if(std::isnan(epn.sum()))
         return false;
 
 
     // ======== check epl length =========
-    float eplLengthSquared = epx*epx+epy*epy;
+    float eplLengthSquared = epn.dot(epn);
     if(eplLengthSquared < MIN_EPL_LENGTH_SQUARED)
     {
         if(enablePrintDebugInfo) stats->num_observe_skipped_small_epl++;
@@ -202,7 +202,9 @@ bool DepthMap::makeAndCheckEPL(const Eigen::Vector2f &p,
     // ===== check epl-grad magnitude ======
     float gx = activeKeyFrameImageData[idx+1] - activeKeyFrameImageData[idx-1];
     float gy = activeKeyFrameImageData[idx+width] - activeKeyFrameImageData[idx-width];
-    float eplGradSquared = gx * epx + gy * epy;
+    Eigen::Vector2f grad;
+    grad << gx, gy;
+    float eplGradSquared = grad.dot(epn);
     eplGradSquared = eplGradSquared*eplGradSquared /
                      eplLengthSquared;	// square and norm with epl-length
 
@@ -214,7 +216,7 @@ bool DepthMap::makeAndCheckEPL(const Eigen::Vector2f &p,
 
 
     // ===== check epl-grad angle ======
-    if(eplGradSquared / (gx*gx+gy*gy) < MIN_EPL_ANGLE_SQUARED)
+    if(eplGradSquared / grad.dot(grad) < MIN_EPL_ANGLE_SQUARED)
     {
         if(enablePrintDebugInfo) stats->num_observe_skipped_small_epl_angle++;
         return false;
@@ -223,8 +225,7 @@ bool DepthMap::makeAndCheckEPL(const Eigen::Vector2f &p,
 
     // ===== DONE - return "normalized" epl =====
     float fac = GRADIENT_SAMPLE_DIST / sqrt(eplLengthSquared);
-    *pepx = epx * fac;
-    *pepy = epy * fac;
+    pep = epn * fac;
 
     return true;
 }
@@ -256,7 +257,7 @@ bool DepthMap::observeDepthCreate(const Eigen::Vector2i &p, const int &idx,
     }
 
     Eigen::Vector2f epn;
-    bool isGood = makeAndCheckEPL(p.cast<float>(), refFrame, &epn(0), &epn(1), stats);
+    bool isGood = makeAndCheckEPL(p.cast<float>(), refFrame, epn, stats);
     if(!isGood) return false;
 
     if(enablePrintDebugInfo) stats->num_observe_create_attempted++;
@@ -340,7 +341,7 @@ bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &p, const int &idx,
     }
 
     Eigen::Vector2f epn;
-    bool isGood = makeAndCheckEPL(p.cast<float>(), refFrame, &epn(0), &epn(1), stats);
+    bool isGood = makeAndCheckEPL(p.cast<float>(), refFrame, epn, stats);
     if(!isGood) return false;
 
     // which exact point to track, and where from.
@@ -1666,7 +1667,7 @@ float DepthMap::doLineStereo(
         pClose = pFar + inc*MAX_EPL_LENGTH_CROP/eplLength;
     }
 
-    inc *= GRADIENT_SAMPLE_DIST/eplLength;
+    inc = inc * GRADIENT_SAMPLE_DIST/eplLength;
 
     // extend one sample_dist to left & right.
     pFar -= inc;
