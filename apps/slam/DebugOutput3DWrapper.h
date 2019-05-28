@@ -93,10 +93,12 @@ public:
     DebugOutput3DWrapper(int width, int height);
     ~DebugOutput3DWrapper();
 
-    void createPointCloud(pcl::PointCloud<pcl::PointXYZRGB> &pointcloud,
-                          const Projection &projection,
-                          const SE3 &camToWorld,
-                          const float *image, const float *idepth);
+    void savePointCloud(std::string filename);
+
+    void addPointsToPointCloud(
+        pcl::PointCloud<pcl::PointXYZRGB> &pointcloud,
+        const Projection &projection, const SE3 &camToWorld,
+        const float *image, const float *idepth, const float *idepth_var);
     virtual void publishKeyframeGraph(KeyFrameGraph* graph);
 
     // publishes a keyframe. if that frame already existis, it is overwritten, otherwise it is added.
@@ -122,23 +124,17 @@ private:
     int width, height;
 
     std::string liveframe_channel;
-    //ros::Publisher liveframe_publisher;
 
     std::string keyframe_channel;
-    //ros::Publisher keyframe_publisher;
 
     std::string graph_channel;
-    //ros::Publisher graph_publisher;
 
     std::string debugInfo_channel;
-    //ros::Publisher debugInfo_publisher;
-
 
     std::string pose_channel;
-    //ros::Publisher pose_publisher;
 
     cv::Mat tracker_display;
 
-    //ros::NodeHandle nh_;
+    pcl::PointCloud<pcl::PointXYZRGB> pointcloud;
 };
 }

@@ -18,6 +18,14 @@
 * along with LSD-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <cmath>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl/io/ply_io.h>
+#define GL_GLEXT_PROTOTYPES
+
+#include <GL/glut.h>
+#include <opencv/highgui.h>
 #include "DebugOutput3DWrapper.h"
 #include "lsd_slam/util/sophus_util.h"
 #include "lsd_slam/util/settings.h"
@@ -32,9 +40,6 @@
 #include "lsd_slam/global_mapping/g2o_type_sim3_sophus.h"
 #include "lsd_slam/projection/projection.h"
 
-#include <pcl/point_cloud.h>
-#include <pcl/point_types.h>
-#include <opencv/highgui.h>
 
 namespace lsd_slam
 {
@@ -63,21 +68,35 @@ void init_rgbpoint(pcl::PointXYZRGB &point, const Eigen::Vector3f P,
     point.rgb = *reinterpret_cast<float*>(&rgb);
 }
 
-void DebugOutput3DWrapper::createPointCloud(pcl::PointCloud<pcl::PointXYZRGB> &pointcloud,
-                                            const Projection &projection,
-                                            const SE3 &camToWorld,
-                                            const float *image, const float *idepth) {
+
+inline bool isReliable(const float idepth, const float idepth_var, const float threshold = 0.03) {
+    if(idepth <= 0) {
+        return false;
+    }
+
+    const float idepth_std = sqrt(idepth_var);
+    const float depth_squared = 1 / (idepth * idepth);  // = (1 / idepth) * (1 / idepth)
+
+    return idepth_std * depth_squared <= threshold;
+}
+
+
+void DebugOutput3DWrapper::addPointsToPointCloud(pcl::PointCloud<pcl::PointXYZRGB> &pointcloud,
+        const Projection &projection, const SE3 &camToWorld,
+        const float *image, const float *idepth, const float *idepth_var) {
 
     for(int v = 0; v < height; v++) {
         for(int u = 0; u < width; u++) {
             const int index = width * v + u;
-            if(idepth[index] <= 0) {
+            // TODO check idepthVar
+
+            if(!isReliable(idepth[index], idepth_var[index], 0.05)) {
                 continue;
             }
 
             Eigen::Matrix<float, 3,1> P;
             P = projection.inv_projection(u, v, 1/idepth[index]);
-            camToWorld * P.cast<double>();
+            P = (camToWorld * P.cast<double>()).cast<float>();
 
             float r, g, b;
             r = g = b = image[index];
@@ -105,9 +124,7 @@ void DebugOutput3DWrapper::publishKeyframe(Frame* f)
     Projection projection(f->fx(publishLvl), f->fy(publishLvl),
                           f->cx(publishLvl), f->cy(publishLvl));
 
-    pcl::PointCloud<pcl::PointXYZRGB> pointcloud;
-    createPointCloud(pointcloud, projection, camToWorld, idepth, image);
-	//keyframe_publisher.publish(fMsg);
+    addPointsToPointCloud(this->pointcloud, projection, camToWorld, image, idepth, idepthVar);
 
 	std::cout << "PublishKeyframe" << std::endl;
 }
