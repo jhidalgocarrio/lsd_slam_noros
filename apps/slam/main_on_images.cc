@@ -187,9 +187,7 @@ int main(int argc, char* argv[])
     const std::string dataset_root = append_slash_to_dirname(std::string(argv[1]));
     const std::string calib_file = dataset_root + "camera.txt";
     const std::string source = dataset_root + "images/";
-    Undistorter* undistorter = 0;
-
-    undistorter = Undistorter::getUndistorterForFile(calib_file);
+    Undistorter* undistorter = Undistorter::getUndistorterForFile(calib_file);
 
     if(undistorter == 0)
     {

@@ -29,8 +29,7 @@ int main(int argc, char** argv) {
 
     std::string calib_fn = std::string(LsdSlam_DIR)
                            + "/data/out_camera_data.xml";
-    CvCapture* capture = cvCaptureFromCAM(
-                             cameraId); //Capture using the camera identified by cameraId
+    CvCapture* capture = cvCaptureFromCAM(cameraId); //Capture using the camera identified by cameraId
     // camera id is 0 for /dev/video0, 1 for /dev/video1 etc
 
     cvSetCaptureProperty(capture, CV_CAP_PROP_FRAME_WIDTH, 640);
@@ -40,8 +39,8 @@ int main(int argc, char** argv) {
     inputStream->setCameraCapture(capture);
     inputStream->run();
 
-    Output3DWrapper* outputWrapper = new DebugOutput3DWrapper(
-        inputStream->width(), inputStream->height());
+    Output3DWrapper* outputWrapper = new DebugOutput3DWrapper(inputStream->width(),
+                                                              inputStream->height());
     LiveSLAMWrapper slamNode(inputStream, outputWrapper);
 
     IplImage* frame = cvQueryFrame(capture); //Create image frames from capture
