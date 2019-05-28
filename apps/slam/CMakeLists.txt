@@ -46,20 +46,22 @@ set(G2O_LIBS
 )
 
 ## demos
-find_package(PCL REQUIRED)
+find_package(PCL REQUIRED COMPONENTS common io)
 include_directories(${PCL_INCLUDE_DIRS})
+
 add_definitions(${PCL_DEFINITIONS})
 link_directories(${PCL_LIBRARY_DIRS})
 
-message("LsdSlam_ALL_LIBRARIES=${LsdSlam_ALL_LIBRARIES}")
 add_executable(main_on_images main_on_images.cc DebugOutput3DWrapper.cpp DebugOutput3DWrapper.h)
 set_property(TARGET main_on_images PROPERTY FOLDER "lsd_slam/apps")
 target_link_libraries(main_on_images
-                      ${LsdSlam_ALL_LIBRARIES} ${LIB_CXSPARSE} ${OpenCV_LIBRARIES} ${PCL_LIBRARY_DIRS})
+                      ${LsdSlam_ALL_LIBRARIES} ${LIB_CXSPARSE} ${PCL_LIBRARIES}
+                      ${OpenCV_LIBRARIES})
 
 add_executable(sample_app sample_app.cc DebugOutput3DWrapper.cpp DebugOutput3DWrapper.h)
 set_property(TARGET sample_app PROPERTY FOLDER "lsd_slam/apps")
 target_link_libraries(sample_app
-                      ${LsdSlam_ALL_LIBRARIES} ${G2O_LIBS} ${LIB_CXSPARSE} ${PCL_LIBRARY_DIRS})
+                      ${LsdSlam_ALL_LIBRARIES} ${LIB_CXSPARSE} ${PCL_LIBRARIES}
+                      ${G2O_LIBS})
 
 lsd_slam_print_status("LsdSlam_ALL_LIBRARIES:${LsdSlam_ALL_LIBRARIES}")
