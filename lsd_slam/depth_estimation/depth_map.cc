@@ -1653,8 +1653,8 @@ float DepthMap::doLineStereo(
     }
 
     // pos in new image of point (xy), assuming max_idepth
-    Eigen::Vector2f pClose = projection(PClose);
-    Eigen::Vector2f pFar = projection(PFar); // pos in new image of point (xy), assuming min_idepth
+    Eigen::Vector2f pClose = to2d(PClose);
+    Eigen::Vector2f pFar = to2d(PFar); // pos in new image of point (xy), assuming min_idepth
 
     // check for nan due to eg division by zero.
     if(std::isnan((float)(pFar[0]+pClose[0])))
