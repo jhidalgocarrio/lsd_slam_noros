@@ -4,7 +4,7 @@ project(lsd_slam)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # Sources & headers ============================================================
-set(modules depth_estimation global_mapping io_wrapper model tracking util)
+set(modules depth_estimation global_mapping io_wrapper model tracking util projection)
 set(lsd_slam_srcs)
 foreach(module ${modules})
   file(GLOB ${module}_srcs ${CMAKE_CURRENT_SOURCE_DIR}/${module}/*.cc

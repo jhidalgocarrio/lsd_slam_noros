@@ -19,10 +19,13 @@
 */
 
 #pragma once
-
-#include "lsd_slam/io_wrapper/output_3d_wrapper.h"
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
 #include <vector>
 #include <opencv2/core/core.hpp>
+
+#include "lsd_slam/io_wrapper/output_3d_wrapper.h"
+#include "lsd_slam/projection/projection.h"
 
 namespace lsd_slam
 {
@@ -90,6 +93,10 @@ public:
     DebugOutput3DWrapper(int width, int height);
     ~DebugOutput3DWrapper();
 
+    void createPointCloud(pcl::PointCloud<pcl::PointXYZRGB> &pointcloud,
+                          const Projection &projection,
+                          const SE3 &camToWorld,
+                          const float *image, const float *idepth);
     virtual void publishKeyframeGraph(KeyFrameGraph* graph);
 
     // publishes a keyframe. if that frame already existis, it is overwritten, otherwise it is added.

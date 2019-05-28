@@ -31,8 +31,8 @@
 #include <algorithm>
 
 #include "util/undistorter.h"
-
 #include "opencv2/opencv.hpp"
+#include "DebugOutput3DWrapper.h"
 
 
 // Gets current projection matrix (= PerspectiveMatrix * CameraPoseMatrix)
@@ -207,7 +207,7 @@ int main(int argc, char* argv[])
     K << fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0;
 
     // make output wrapper. just set to zero if no output is required.
-    Output3DWrapper* outputWrapper = nullptr; // new ROSOutput3DWrapper(w,h);
+    Output3DWrapper* outputWrapper = new DebugOutput3DWrapper(w, h);
 
     // make slam system
     SlamSystem* system = new SlamSystem(w, h, K);

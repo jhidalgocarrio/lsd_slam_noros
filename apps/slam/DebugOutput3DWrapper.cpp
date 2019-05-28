@@ -25,10 +25,15 @@
 //#include "lsd_slam_viewer/keyframeGraphMsg.h"
 //#include "lsd_slam_viewer/keyframeMsg.h"
 
+#include "sophus/sim3.hpp"
+#include "sophus/se3.hpp"
 #include "lsd_slam/model/frame.h"
 #include "lsd_slam/global_mapping/key_frame_graph.h"
-#include "sophus/sim3.hpp"
 #include "lsd_slam/global_mapping/g2o_type_sim3_sophus.h"
+#include "lsd_slam/projection/projection.h"
+
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
 #include <opencv/highgui.h>
 
 namespace lsd_slam
@@ -48,48 +53,60 @@ DebugOutput3DWrapper::~DebugOutput3DWrapper()
 }
 
 
+void init_rgbpoint(pcl::PointXYZRGB &point, const Eigen::Vector3f P,
+                   const uint8_t r, const uint8_t g, const uint8_t b) {
+    point.x = P(0);
+    point.y = P(1);
+    point.z = P(2);
+
+    uint32_t rgb = ((uint32_t)r << 16 | (uint32_t)g << 8 | (uint32_t)b);
+    point.rgb = *reinterpret_cast<float*>(&rgb);
+}
+
+void DebugOutput3DWrapper::createPointCloud(pcl::PointCloud<pcl::PointXYZRGB> &pointcloud,
+                                            const Projection &projection,
+                                            const SE3 &camToWorld,
+                                            const float *image, const float *idepth) {
+
+    for(int v = 0; v < height; v++) {
+        for(int u = 0; u < width; u++) {
+            const int index = width * v + u;
+            if(idepth[index] <= 0) {
+                continue;
+            }
+
+            Eigen::Matrix<float, 3,1> P;
+            P = projection.inv_projection(u, v, 1/idepth[index]);
+            camToWorld * P.cast<double>();
+
+            float r, g, b;
+            r = g = b = image[index];
+
+            pcl::PointXYZRGB point;
+            init_rgbpoint(point, P, r, g, b);
+            pointcloud.push_back(point);
+        }
+    }
+}
+
 void DebugOutput3DWrapper::publishKeyframe(Frame* f)
 {
-	KeyFrameMessage fMsg;
-
-
 	boost::shared_lock<boost::shared_mutex> lock = f->getActiveLock();
 
-	fMsg.id = f->id();
-	fMsg.time = f->timestamp();
-	fMsg.isKeyframe = true;
+	int width = f->width(publishLvl);
+	int height = f->height(publishLvl);
 
-	int w = f->width(publishLvl);
-	int h = f->height(publishLvl);
+	SE3 camToWorld = se3FromSim3(f->getScaledCamToWorld());
 
-	memcpy(fMsg.camToWorld.data(), f->getScaledCamToWorld().cast<float>().data(), sizeof(float)*7);
-	fMsg.fx = f->fx(publishLvl);
-	fMsg.fy = f->fy(publishLvl);
-	fMsg.cx = f->cx(publishLvl);
-	fMsg.cy = f->cy(publishLvl);
-	fMsg.width = w;
-	fMsg.height = h;
+	const float* idepth = f->idepth(publishLvl);
+	const float* idepthVar = f->idepthVar(publishLvl);
+	const float* image = f->image(publishLvl);
 
-	
+    Projection projection(f->fx(publishLvl), f->fy(publishLvl),
+                          f->cx(publishLvl), f->cy(publishLvl));
 
-	//fMsg.pointcloud.resize(w*h*sizeof(InputPointDense));
-
-	//InputPointDense* pc = (InputPointDense*)fMsg.pointcloud.data();
-
-	//const float* idepth = f->idepth(publishLvl);
-	//const float* idepthVar = f->idepthVar(publishLvl);
-	//const float* color = f->image(publishLvl);
-	//
-	//for(int idx=0;idx < w*h; idx++)
-	//{
-	//	pc[idx].idepth = idepth[idx];
-	//	pc[idx].idepth_var = idepthVar[idx];
-	//	pc[idx].color[0] = color[idx];
-	//	pc[idx].color[1] = color[idx];
-	//	pc[idx].color[2] = color[idx];
-	//	pc[idx].color[3] = color[idx];
-	//}
-
+    pcl::PointCloud<pcl::PointXYZRGB> pointcloud;
+    createPointCloud(pointcloud, projection, camToWorld, idepth, image);
 	//keyframe_publisher.publish(fMsg);
 
 	std::cout << "PublishKeyframe" << std::endl;
