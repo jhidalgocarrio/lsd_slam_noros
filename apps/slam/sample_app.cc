@@ -53,26 +53,6 @@ int main(int argc, char** argv) {
 
     slamNode.Loop();
 
-    //Undistorter* undistorter = Undistorter::getUndistorterForFile("out_camera_data.xml");
-
-    //while (1){ //Create infinte loop for live streaming
-    //	IplImage* frame = cvQueryFrame(capture); //Create image frames from capture
-    //	TimestampedMat bufferItem;
-    //	bufferItem.timestamp = Timestamp::now();
-    //
-    //	cv::Mat mymat = cv::Mat(frame, true);
-
-    //
-    //	undistorter->undistort(frame, mymat);
-    //
-    //	cvShowImage("Camera_Output", frame); //Show image frames on created window
-    //	cv::imshow("Camera_Output_Undist", mymat);
-    //	key = cvWaitKey(10); //Capture Keyboard stroke
-    //	if (char(key) == 27){
-    //		break; //If you hit ESC key loop will break.
-    //	}
-    //}
-
     if (inputStream != nullptr)
         delete inputStream;
     if (outputWrapper != nullptr)

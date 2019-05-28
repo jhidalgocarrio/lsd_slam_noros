@@ -48,8 +48,8 @@ Eigen::Matrix<double, 3, 4> get_projection(Tracker& tracker) {
     std::vector<double> rot = tracker.GetCurrentPose();
     Eigen::Matrix<double, 3, 3> mrot;
     mrot << rot[0], rot[1], rot[2],
-         rot[3], rot[4], rot[5],
-         rot[6], rot[7], rot[8];
+            rot[3], rot[4], rot[5],
+            rot[6], rot[7], rot[8];
     Eigen::Matrix<double, 3, 4> pose;
     pose.setZero();
     pose.block<3, 3>(0, 0) = mrot;

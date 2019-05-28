@@ -53,15 +53,12 @@ LiveSLAMWrapper::LiveSLAMWrapper(InputImageStream* imageStream,
 
     outFileName = packagePath+"estimated_poses.txt";
 
-
     isInitialized = false;
-
 
     Sophus::Matrix3f K_sophus;
     K_sophus << fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0;
 
     outFile = nullptr;
-
 
     // make Odometry
     monoOdometry = new SlamSystem(width, height, K_sophus);
@@ -93,7 +90,6 @@ void LiveSLAMWrapper::Loop()
             notifyCondition.wait(waitLock);
         }
         waitLock.unlock();
-
 
         if(fullResetRequested)
         {
