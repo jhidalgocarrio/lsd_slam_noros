@@ -205,7 +205,7 @@ int main(int argc, char* argv[])
     K << fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0;
 
     // make output wrapper. just set to zero if no output is required.
-    Output3DWrapper* outputWrapper = new DebugOutput3DWrapper(w, h);
+    DebugOutput3DWrapper* outputWrapper = new DebugOutput3DWrapper(w, h);
 
     // make slam system
     SlamSystem* system = new SlamSystem(w, h, K);
@@ -243,12 +243,18 @@ int main(int argc, char* argv[])
         runningIDX++;
         fakeTimeStamp+=0.03;
 
+        if(i % 10 == 0) {
+            outputWrapper->savePointCloud("pointcloud.ply");
+        }
+
         if(fullResetRequested)
         {
 
             printf("FULL RESET!\n");
             delete system;
 
+            // TODO change name at every reinitialization
+            outputWrapper->savePointCloud("pointcloud.ply");
             system = new SlamSystem(w, h, K);
             system->setVisualization(outputWrapper);
 
@@ -256,6 +262,8 @@ int main(int argc, char* argv[])
             runningIDX = 0;
         }
     }
+
+    outputWrapper->savePointCloud("pointcloud.ply");
 
     system->finalize();
 

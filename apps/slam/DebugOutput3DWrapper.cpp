@@ -108,6 +108,14 @@ void DebugOutput3DWrapper::addPointsToPointCloud(pcl::PointCloud<pcl::PointXYZRG
     }
 }
 
+
+void DebugOutput3DWrapper::savePointCloud(std::string filename) {
+    std::cout << "Exporting pointcloud to " << filename << std::endl;
+
+    pcl::io::savePLYFile(filename, this->pointcloud);
+}
+
+
 void DebugOutput3DWrapper::publishKeyframe(Frame* f)
 {
 	boost::shared_lock<boost::shared_mutex> lock = f->getActiveLock();
