@@ -45,13 +45,9 @@ namespace lsd_slam
 {
 
 
-DebugOutput3DWrapper::DebugOutput3DWrapper(int width, int height)
-{
-	this->width = width;
-	this->height = height;
-
-	publishLvl=0;
-}
+DebugOutput3DWrapper::DebugOutput3DWrapper(
+    const int width_, const int height_, const int publishLvl_) :
+    width(width_), height(height_), publishLvl(publishLvl_) {}
 
 DebugOutput3DWrapper::~DebugOutput3DWrapper()
 {

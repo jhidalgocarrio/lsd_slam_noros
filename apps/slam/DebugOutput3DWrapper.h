@@ -90,7 +90,7 @@ class DebugOutput3DWrapper : public Output3DWrapper
 public:
 
     // initializes cam-calib independent stuff
-    DebugOutput3DWrapper(int width, int height);
+    DebugOutput3DWrapper(const int width_, const int height_, const int publishLvl_ = 0);
     ~DebugOutput3DWrapper();
 
     void savePointCloud(std::string filename);
@@ -118,10 +118,10 @@ public:
     virtual void publishDebugInfo(const Eigen::Matrix<float, 20, 1>& data);
 
 
-    int publishLvl;
-
 private:
-    int width, height;
+    const int width;
+    const int height;
+    const int publishLvl;
 
     pcl::PointCloud<pcl::PointXYZRGB> pointcloud;
 };
