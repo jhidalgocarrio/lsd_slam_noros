@@ -18,7 +18,6 @@
 * along with LSD-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "live_slam_wrapper.h"
 
 #include <boost/thread.hpp>
 #include "util/settings.h"

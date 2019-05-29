@@ -26,7 +26,6 @@
 #include "tracking/sim3_tracker.h"
 #include "depth_estimation/depth_map.h"
 #include "tracking/tracking_reference.h"
-#include "live_slam_wrapper.h"
 #include "util/global_funcs.h"
 #include "global_mapping/key_frame_graph.h"
 #include "global_mapping/trackable_key_frame_search.h"

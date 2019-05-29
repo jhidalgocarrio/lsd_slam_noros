@@ -58,10 +58,4 @@ target_link_libraries(main_on_images
                       ${LsdSlam_ALL_LIBRARIES} ${LIB_CXSPARSE} ${PCL_LIBRARIES}
                       ${OpenCV_LIBRARIES})
 
-add_executable(sample_app sample_app.cc DebugOutput3DWrapper.cpp DebugOutput3DWrapper.h)
-set_property(TARGET sample_app PROPERTY FOLDER "lsd_slam/apps")
-target_link_libraries(sample_app
-                      ${LsdSlam_ALL_LIBRARIES} ${LIB_CXSPARSE} ${PCL_LIBRARIES}
-                      ${G2O_LIBS})
-
 lsd_slam_print_status("LsdSlam_ALL_LIBRARIES:${LsdSlam_ALL_LIBRARIES}")
