@@ -123,18 +123,6 @@ public:
 private:
     int width, height;
 
-    std::string liveframe_channel;
-
-    std::string keyframe_channel;
-
-    std::string graph_channel;
-
-    std::string debugInfo_channel;
-
-    std::string pose_channel;
-
-    cv::Mat tracker_display;
-
     pcl::PointCloud<pcl::PointXYZRGB> pointcloud;
 };
 }
