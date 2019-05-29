@@ -203,12 +203,8 @@ int main(int argc, char* argv[])
     Sophus::Matrix3f K;
     K << fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0;
 
-    // make output wrapper. just set to zero if no output is required.
-    DebugOutput3DWrapper* outputWrapper = new DebugOutput3DWrapper(w, h);
-
     // make slam system
-    SlamSystem* system = new SlamSystem(w, h, K);
-    system->setVisualization(outputWrapper);
+    SlamSystem* system = new SlamSystem(w, h, K, std::make_shared<DebugOutput3DWrapper>(w, h));
 
     std::vector<std::string> files;
     if(getdir(source, files) >= 0) {
@@ -242,10 +238,6 @@ int main(int argc, char* argv[])
         runningIDX++;
         fakeTimeStamp+=0.03;
 
-        if(i % 10 == 0) {
-            outputWrapper->savePointCloud("pointcloud.ply");
-        }
-
         if(fullResetRequested)
         {
 
@@ -253,21 +245,16 @@ int main(int argc, char* argv[])
             delete system;
 
             // TODO change name at every reinitialization
-            outputWrapper->savePointCloud("pointcloud.ply");
-            system = new SlamSystem(w, h, K);
-            system->setVisualization(outputWrapper);
+            system = new SlamSystem(w, h, K, std::make_shared<DebugOutput3DWrapper>(w, h));
 
             fullResetRequested = false;
             runningIDX = 0;
         }
     }
 
-    outputWrapper->savePointCloud("pointcloud.ply");
-
     system->finalize();
 
     delete system;
     delete undistorter;
-    delete outputWrapper;
     return 0;
 }

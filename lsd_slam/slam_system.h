@@ -67,7 +67,7 @@ public:
 
     bool trackingIsGood;
 
-    SlamSystem(int w, int h, Eigen::Matrix3f K);
+    SlamSystem(int w, int h, Eigen::Matrix3f K, std::shared_ptr<Output3DWrapper> outputWrapper);
     SlamSystem(const SlamSystem&) = delete;
     SlamSystem& operator=(const SlamSystem&) = delete;
     ~SlamSystem();
@@ -98,7 +98,7 @@ public:
     SE3 getCurrentPoseEstimate();
 
     /** Sets the visualization where point clouds and camera poses will be sent to. */
-    void setVisualization(Output3DWrapper* outputWrapper);
+    void setVisualization(std::shared_ptr<Output3DWrapper> outputWrapper);
 
     void requestDepthMapScreenshot(const std::string& filename);
 
@@ -175,7 +175,7 @@ private:
 
 
     // Individual / no locking
-    Output3DWrapper* outputWrapper;	// no lock required
+    std::shared_ptr<Output3DWrapper> outputWrapper;	// no lock required
     KeyFrameGraph* keyFrameGraph;	// has own locks
 
 

@@ -54,7 +54,8 @@
 using namespace lsd_slam;
 
 
-SlamSystem::SlamSystem(int w, int h, Eigen::Matrix3f K) : relocalizer(w,h,K)
+SlamSystem::SlamSystem(int w, int h, Eigen::Matrix3f K, std::shared_ptr<Output3DWrapper> outputWrapper_) :
+    outputWrapper(outputWrapper_), relocalizer(w,h,K)
 {
     if(w%16 != 0 || h%16!=0)
     {
@@ -92,7 +93,6 @@ SlamSystem::SlamSystem(int w, int h, Eigen::Matrix3f K) : relocalizer(w,h,K)
     newKFTrackingReference = new TrackingReference();
     candidateTrackingReference = new TrackingReference();
 
-    outputWrapper = 0;
 
     keepRunning = true;
     doFinalOptimization = false;
@@ -156,10 +156,6 @@ SlamSystem::~SlamSystem()
     FrameMemory::getInstance().releaseBuffes();
 }
 
-void SlamSystem::setVisualization(Output3DWrapper* outputWrapper)
-{
-    this->outputWrapper = outputWrapper;
-}
 
 void SlamSystem::mergeOptimizationOffset()
 {
