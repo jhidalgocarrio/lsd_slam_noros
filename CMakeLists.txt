@@ -98,13 +98,6 @@ if(LsdSlam_BUILD_SHARED_LIBS)
 endif()
 
 # External dependencies ========================================================
-if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/LsdSlamDependencies_Config.cmake")
-  file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/cmake/LsdSlamDependencies_Config.cmake.in"
-       DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
-  file(RENAME "${CMAKE_CURRENT_BINARY_DIR}/LsdSlamDependencies_Config.cmake.in"
-              "${CMAKE_CURRENT_BINARY_DIR}/LsdSlamDependencies_Config.cmake")
-endif()
-include(LsdSlamDependencies_Config)  # option for manual configuration
 include(LsdSlamDependencies)
 
 # Thirdparty libs ==============================================================
