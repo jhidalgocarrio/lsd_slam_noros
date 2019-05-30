@@ -33,6 +33,8 @@ class Undistorter
 public:
     virtual ~Undistorter();
 
+    void undistort_color(cv::Mat& image, cv::OutputArray &result);
+
     /**
      * Undistorts the given image and returns the result image.
      */

@@ -70,6 +70,23 @@ Undistorter* Undistorter::getUndistorterForFile(const std::string
 }
 
 
+void Undistorter::undistort_color(cv::Mat& image, cv::OutputArray &result) {
+    assert(image.type() == CV_8UC3);
+
+    const int n_channels = 3;
+
+    std::vector<cv::Mat> channels_in(n_channels);
+    std::vector<cv::Mat> channels_out(n_channels);
+
+    split(image, channels_in);
+    for(int i = 0; i < n_channels; i++) {
+        this->undistort(channels_in[i], channels_out[i]);
+    }
+
+    merge(channels_out, result);
+}
+
+
 UndistorterPTAM::UndistorterPTAM(const char* configFileName)
 {
     valid = true;

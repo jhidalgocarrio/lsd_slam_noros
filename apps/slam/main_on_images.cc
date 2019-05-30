@@ -30,7 +30,7 @@
 #include <algorithm>
 
 #include "util/undistorter.h"
-#include "opencv2/opencv.hpp"
+#include <opencv2/opencv.hpp>
 #include "DebugOutput3DWrapper.h"
 
 
@@ -203,8 +203,11 @@ int main(int argc, char* argv[])
     Sophus::Matrix3f K;
     K << fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0;
 
+    std::shared_ptr<DebugOutput3DWrapper> outputWrapper;
+
     // make slam system
-    SlamSystem* system = new SlamSystem(w, h, K, std::make_shared<DebugOutput3DWrapper>(w, h));
+    outputWrapper = std::make_shared<DebugOutput3DWrapper>(w, h);
+    SlamSystem* system = new SlamSystem(w, h, K, outputWrapper);
 
     std::vector<std::string> files;
     if(getdir(source, files) >= 0) {
@@ -216,7 +219,7 @@ int main(int argc, char* argv[])
     }
 
 
-    cv::Mat image = cv::Mat(h,w,CV_8U);
+    cv::Mat color_image = cv::Mat(h, w, CV_8UC3);
     int runningIDX=0;
     float fakeTimeStamp = 0;
 
@@ -224,33 +227,46 @@ int main(int argc, char* argv[])
     {
         std::cout << "reading " << files[i] << std::endl;
 
-        cv::Mat imageDist = cv::imread(files[i], CV_LOAD_IMAGE_GRAYSCALE);
+        cv::Mat imageDist = cv::imread(files[i], CV_LOAD_IMAGE_COLOR);
 
-        assert(imageDist.type() == CV_8U);
+        undistorter->undistort_color(imageDist, color_image);
 
-        undistorter->undistort(imageDist, image);
-        assert(image.type() == CV_8U);
+
+        cv::Mat gray_image;
+        cv::cvtColor(color_image, gray_image, cv::COLOR_RGB2GRAY);
 
         if(runningIDX == 0)
-            system->randomInit(image.data, fakeTimeStamp, runningIDX);
+            system->randomInit(gray_image.data, fakeTimeStamp, runningIDX);
         else
-            system->trackFrame(image.data, runningIDX, false,fakeTimeStamp);
+            system->trackFrame(gray_image.data, runningIDX, false,fakeTimeStamp);
+
+        outputWrapper->addImage(color_image, runningIDX);
+
         runningIDX++;
         fakeTimeStamp+=0.03;
 
+        if(i % 10 == 0) {
+            outputWrapper->savePointCloud("pointcloud.ply");
+        }
+
         if(fullResetRequested)
         {
-
             printf("FULL RESET!\n");
+            outputWrapper->savePointCloud("pointcloud.ply");
+
             delete system;
 
             // TODO change name at every reinitialization
-            system = new SlamSystem(w, h, K, std::make_shared<DebugOutput3DWrapper>(w, h));
+            outputWrapper = std::make_shared<DebugOutput3DWrapper>(w, h);
+            system = new SlamSystem(w, h, K, outputWrapper);
+
 
             fullResetRequested = false;
             runningIDX = 0;
         }
     }
+
+    outputWrapper->savePointCloud("pointcloud.ply");
 
     system->finalize();
 

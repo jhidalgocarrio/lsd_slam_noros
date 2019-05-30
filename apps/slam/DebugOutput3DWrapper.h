@@ -22,7 +22,6 @@
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <vector>
-#include <opencv2/core/core.hpp>
 
 #include "lsd_slam/io_wrapper/output_3d_wrapper.h"
 #include "lsd_slam/projection/projection.h"
@@ -96,9 +95,10 @@ public:
     void savePointCloud(std::string filename);
 
     void addPointsToPointCloud(
-        pcl::PointCloud<pcl::PointXYZRGB> &pointcloud,
-        const Projection &projection, const SE3 &camToWorld,
-        const float *image, const float *idepth, const float *idepth_var);
+            pcl::PointCloud<pcl::PointXYZRGB> &pointcloud,
+            const Projection &projection, const Sim3 &camToWorld,
+            const int id, const float *idepth, const float *idepth_var);
+
     virtual void publishKeyframeGraph(KeyFrameGraph* graph);
 
     // publishes a keyframe. if that frame already existis, it is overwritten, otherwise it is added.
@@ -125,4 +125,5 @@ private:
 
     pcl::PointCloud<pcl::PointXYZRGB> pointcloud;
 };
+
 }

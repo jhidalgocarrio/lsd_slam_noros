@@ -25,6 +25,7 @@
 #define GL_GLEXT_PROTOTYPES
 
 #include <GL/glut.h>
+#include <opencv2/opencv.hpp>
 #include <opencv/highgui.h>
 #include "DebugOutput3DWrapper.h"
 #include "lsd_slam/util/sophus_util.h"
@@ -35,6 +36,7 @@
 
 #include "sophus/sim3.hpp"
 #include "sophus/se3.hpp"
+#include "lsd_slam/io_wrapper/output_3d_wrapper.h"
 #include "lsd_slam/model/frame.h"
 #include "lsd_slam/global_mapping/key_frame_graph.h"
 #include "lsd_slam/global_mapping/g2o_type_sim3_sophus.h"
@@ -54,13 +56,13 @@ DebugOutput3DWrapper::~DebugOutput3DWrapper()
 }
 
 
-void init_rgbpoint(pcl::PointXYZRGB &point, const Eigen::Vector3f P,
-                   const uint8_t r, const uint8_t g, const uint8_t b) {
+void init_rgbpoint(pcl::PointXYZRGB &point, const Eigen::Vector3f P, const cv::Vec3b color) {
+    uint32_t rgb = ((uint32_t)color(0) << 16 | (uint32_t)color(1) << 8 | (uint32_t)color(2));
+
     point.x = P(0);
     point.y = P(1);
     point.z = P(2);
 
-    uint32_t rgb = ((uint32_t)r << 16 | (uint32_t)g << 8 | (uint32_t)b);
     point.rgb = *reinterpret_cast<float*>(&rgb);
 }
 
@@ -76,10 +78,12 @@ inline bool isReliable(const float idepth, const float idepth_var, const float t
     return idepth_std * depth_squared <= threshold;
 }
 
+void DebugOutput3DWrapper::addPointsToPointCloud(
+        pcl::PointCloud<pcl::PointXYZRGB> &pointcloud,
+        const Projection &projection, const Sim3 &camToWorld,
+        const int id, const float *idepth, const float *idepth_var) {
 
-void DebugOutput3DWrapper::addPointsToPointCloud(pcl::PointCloud<pcl::PointXYZRGB> &pointcloud,
-        const Projection &projection, const SE3 &camToWorld,
-        const float *image, const float *idepth, const float *idepth_var) {
+    const cv::Mat image = getImage(id);
 
     for(int v = 0; v < height; v++) {
         for(int u = 0; u < width; u++) {
@@ -94,11 +98,8 @@ void DebugOutput3DWrapper::addPointsToPointCloud(pcl::PointCloud<pcl::PointXYZRG
             P = projection.inv_projection(u, v, 1/idepth[index]);
             P = (camToWorld * P.cast<double>()).cast<float>();
 
-            float r, g, b;
-            r = g = b = image[index];
-
             pcl::PointXYZRGB point;
-            init_rgbpoint(point, P, r, g, b);
+            init_rgbpoint(point, P, image.at<cv::Vec3b>(v, u));
             pointcloud.push_back(point);
         }
     }
@@ -119,16 +120,13 @@ void DebugOutput3DWrapper::publishKeyframe(Frame* f)
 	int width = f->width(publishLvl);
 	int height = f->height(publishLvl);
 
-	SE3 camToWorld = se3FromSim3(f->getScaledCamToWorld());
-
-	const float* idepth = f->idepth(publishLvl);
-	const float* idepthVar = f->idepthVar(publishLvl);
-	const float* image = f->image(publishLvl);
+	Sim3 camToWorld = f->getScaledCamToWorld();
 
     Projection projection(f->fx(publishLvl), f->fy(publishLvl),
                           f->cx(publishLvl), f->cy(publishLvl));
 
-    addPointsToPointCloud(this->pointcloud, projection, camToWorld, image, idepth, idepthVar);
+    addPointsToPointCloud(this->pointcloud, projection, camToWorld,
+                          f->id(), f->idepth(publishLvl), f->idepthVar(publishLvl));
 
 	std::cout << "PublishKeyframe" << std::endl;
 }

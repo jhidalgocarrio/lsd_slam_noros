@@ -34,6 +34,7 @@
 #include "io_wrapper/output_3d_wrapper.h"
 
 #include <g2o/core/robust_kernel_impl.h>
+#include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 
 #include "util/snprintf.h"

@@ -21,6 +21,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <opencv2/core/core.hpp>
 #include "util/sophus_util.h"
 
 namespace cv {
@@ -42,24 +43,38 @@ class Frame;
  */
 class Output3DWrapper
 {
-public:
-    virtual ~Output3DWrapper() {};
+ public:
+  inline cv::Mat getImage(const int id);
+  inline void addImage(const cv::Mat &image, const int id);
 
-    virtual void publishKeyframeGraph(KeyFrameGraph* graph) {};
+  virtual ~Output3DWrapper() {};
 
-    // publishes a keyframe. if that frame already existis, it is overwritten, otherwise it is added.
-    virtual void publishKeyframe(Frame* kf) {};
+  virtual void publishKeyframeGraph(KeyFrameGraph* graph) {};
 
-    // published a tracked frame that did not become a keyframe (yet; i.e. has no depth data)
-    virtual void publishTrackedFrame(Frame* kf) {};
+  // publishes a keyframe. if that frame already existis, it is overwritten, otherwise it is added.
+  virtual void publishKeyframe(Frame* kf) {};
 
-    // publishes graph and all constraints, as well as updated KF poses.
-    virtual void publishTrajectory(std::vector<Eigen::Matrix<float, 3, 1>>
-                                   trajectory, std::string identifier) {};
-    virtual void publishTrajectoryIncrement(Eigen::Matrix<float, 3, 1> pt,
-                                            std::string identifier) {};
+  // published a tracked frame that did not become a keyframe (yet; i.e. has no depth data)
+  virtual void publishTrackedFrame(Frame* kf) {};
 
-    virtual void publishDebugInfo(const Eigen::Matrix<float, 20, 1>& data) {};
+  // publishes graph and all constraints, as well as updated KF poses.
+  virtual void publishTrajectory(std::vector<Eigen::Matrix<float, 3, 1>>
+                                 trajectory, std::string identifier) {};
+  virtual void publishTrajectoryIncrement(Eigen::Matrix<float, 3, 1> pt,
+                                          std::string identifier) {};
 
+  virtual void publishDebugInfo(const Eigen::Matrix<float, 20, 1>& data) {};
+
+ protected:
+  std::map<int, cv::Mat> id_image_map;
 };
+
+
+inline cv::Mat Output3DWrapper::getImage(const int id) {
+    return id_image_map[id];
+}
+
+inline void Output3DWrapper::addImage(const cv::Mat &image, const int id) {
+    id_image_map[id] = image;
+}
 }
