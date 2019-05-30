@@ -85,6 +85,7 @@ void DebugOutput3DWrapper::addPointsToPointCloud(
 
     const cv::Mat image = getImage(id);
 
+    int n_added = 0;
     for(int v = 0; v < height; v++) {
         for(int u = 0; u < width; u++) {
             const int index = width * v + u;
@@ -101,10 +102,13 @@ void DebugOutput3DWrapper::addPointsToPointCloud(
             pcl::PointXYZRGB point;
             init_rgbpoint(point, P, image.at<cv::Vec3b>(v, u));
             pointcloud.push_back(point);
+
+            n_added += 1;
         }
     }
-}
 
+    std::cout << 100 * (float)n_added / (float)(height * width) << " % of points added" << std::endl;
+}
 
 void DebugOutput3DWrapper::savePointCloud(std::string filename) {
     std::cout << "Exporting pointcloud to " << filename << std::endl;
