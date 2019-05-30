@@ -841,8 +841,8 @@ bool SlamSystem::doMappingIteration()
 }
 
 
-void SlamSystem::gtDepthInit(uchar* image, float* depth, double timeStamp,
-                             int id)
+void SlamSystem::gtDepthInit(
+    uchar* image, float* depth, double timeStamp, int id)
 {
     printf("Doing GT initialization!\n");
 
@@ -871,11 +871,12 @@ void SlamSystem::gtDepthInit(uchar* image, float* depth, double timeStamp,
 
 void SlamSystem::randomInit(uchar* image, double timeStamp, int id)
 {
+
     printf("Doing Random initialization!\n");
 
     if(!doMapping)
-        printf("WARNING: mapping is disabled, but we just initialized... THIS WILL NOT WORK! Set doMapping to true.\n");
-
+        printf("WARNING: mapping is disabled, "
+               "but we just initialized... THIS WILL NOT WORK! Set doMapping to true.\n");
 
     currentKeyFrameMutex.lock();
 
@@ -908,8 +909,8 @@ void SlamSystem::trackFrame(uchar* image, unsigned int frameID,
 {
 
     // Create new frame
-    std::shared_ptr<Frame> trackingNewFrame(new Frame(frameID, width, height, K,
-                                            timestamp, image));
+    std::shared_ptr<Frame> trackingNewFrame(
+        new Frame(frameID, width, height, K, timestamp, image));
 
     if(!trackingIsGood)
     {

@@ -26,9 +26,9 @@
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/locks.hpp>
+#include <opencv2/core/core.hpp>
 #include "util/settings.h"
 #include "io_wrapper/timestamp.h"
-#include "opencv2/core/core.hpp"
 
 #include "util/sophus_util.h"
 #include "tracking/relocalizer.h"
@@ -74,8 +74,6 @@ public:
 
     void randomInit(uchar* image, double timeStamp, int id);
     void gtDepthInit(uchar* image, float* depth, double timeStamp, int id);
-
-
 
     // tracks a frame.
     // first frame will return Identity = camToWord.
@@ -128,8 +126,8 @@ private:
 
 
     // ============= EXCLUSIVELY TRACKING THREAD (+ init) ===============
-    TrackingReference*
-    trackingReference; // tracking reference for current keyframe. only used by tracking.
+    TrackingReference* trackingReference;
+    // tracking reference for current keyframe. only used by tracking.
     SE3Tracker* tracker;
 
 
@@ -277,8 +275,6 @@ private:
         float strictness);
 
     void optimizationThreadLoop();
-
-
 
 };
 
