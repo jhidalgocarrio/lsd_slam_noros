@@ -22,25 +22,27 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/io/ply_io.h>
+#include <pcl/io/pcd_io.h>
+
 #define GL_GLEXT_PROTOTYPES
 
 #include <GL/glut.h>
 #include <opencv2/opencv.hpp>
 #include <opencv/highgui.h>
-#include "DebugOutput3DWrapper.h"
-#include "lsd_slam/util/sophus_util.h"
-#include "lsd_slam/util/settings.h"
-
-//#include "lsd_slam_viewer/keyframeGraphMsg.h"
-//#include "lsd_slam_viewer/keyframeMsg.h"
 
 #include "sophus/sim3.hpp"
 #include "sophus/se3.hpp"
+
+#include "lsd_slam/util/sophus_util.h"
+#include "lsd_slam/util/settings.h"
+
 #include "lsd_slam/io_wrapper/output_3d_wrapper.h"
 #include "lsd_slam/model/frame.h"
 #include "lsd_slam/global_mapping/key_frame_graph.h"
 #include "lsd_slam/global_mapping/g2o_type_sim3_sophus.h"
 #include "lsd_slam/projection/projection.h"
+
+#include "DebugOutput3DWrapper.h"
 
 
 namespace lsd_slam
@@ -57,13 +59,13 @@ DebugOutput3DWrapper::~DebugOutput3DWrapper()
 
 
 void init_rgbpoint(pcl::PointXYZRGB &point, const Eigen::Vector3f P, const cv::Vec3b color) {
-    uint32_t rgb = ((uint32_t)color(0) << 16 | (uint32_t)color(1) << 8 | (uint32_t)color(2));
-
     point.x = P(0);
     point.y = P(1);
     point.z = P(2);
 
-    point.rgb = *reinterpret_cast<float*>(&rgb);
+    point.r = color(0);
+    point.g = color(1);
+    point.b = color(2);
 }
 
 
