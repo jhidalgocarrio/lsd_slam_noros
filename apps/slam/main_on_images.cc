@@ -177,8 +177,9 @@ using namespace lsd_slam;
 int main(int argc, char* argv[])
 {
 
-    if(argc < 2) {
-        std::cout << "Usage: $./bin/main_on_images data/sequence_${sequence_number}/"
+    if(argc < 3) {
+        std::cout << "Usage: $./bin/main_on_images "
+                     "data/sequence_${sequence_number}/ <filename to expont pointcloud>"
                   << std::endl;
         exit(-1);
     }
@@ -187,6 +188,8 @@ int main(int argc, char* argv[])
     const std::string calib_file = dataset_root + "camera.txt";
     const std::string source = dataset_root + "images/";
     Undistorter* undistorter = Undistorter::getUndistorterForFile(calib_file);
+
+    const std::string pointcloud_filename = std::string(argv[2]);
 
     if(undistorter == 0)
     {
@@ -231,7 +234,6 @@ int main(int argc, char* argv[])
 
         undistorter->undistort_color(imageDist, color_image);
 
-
         cv::Mat gray_image;
         cv::cvtColor(color_image, gray_image, cv::COLOR_RGB2GRAY);
 
@@ -246,13 +248,13 @@ int main(int argc, char* argv[])
         fakeTimeStamp+=0.03;
 
         if(i % 10 == 0) {
-            outputWrapper->savePointCloud("pointcloud.ply");
+            outputWrapper->savePointCloud(pointcloud_filename);
         }
 
         if(fullResetRequested)
         {
             printf("FULL RESET!\n");
-            outputWrapper->savePointCloud("pointcloud.ply");
+            outputWrapper->savePointCloud(pointcloud_filename);
 
             delete system;
 
@@ -266,7 +268,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    outputWrapper->savePointCloud("pointcloud.ply");
+    outputWrapper->savePointCloud(pointcloud_filename);
 
     system->finalize();
 
