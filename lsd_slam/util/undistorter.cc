@@ -22,6 +22,7 @@
 
 #include <sstream>
 #include <fstream>
+#include <iostream>
 
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
@@ -33,6 +34,21 @@ namespace lsd_slam
 Undistorter::~Undistorter()
 {
 }
+
+int isRadTanParameters(std::string line) {
+    float ic[8];
+    return std::sscanf(line.c_str(), "%f %f %f %f %f %f %f %f",
+                       &ic[0], &ic[1], &ic[2], &ic[3],
+                       &ic[4], &ic[5], &ic[6], &ic[7]) == 8;
+}
+
+
+int isFOVParameters(std::string line) {
+    float ic[5];
+    return std::sscanf(line.c_str(), "%f %f %f %f %f",
+                       &ic[0], &ic[1], &ic[2], &ic[3], &ic[4]) == 5;
+}
+
 
 Undistorter* Undistorter::getUndistorterForFile(const std::string
         &configFilename)
@@ -58,14 +74,19 @@ Undistorter* Undistorter::getUndistorterForFile(const std::string
     printf(" ... found!\n");
 
     std::string l1;
-    std::string l2;
     std::getline(f,l1);
-    std::getline(f,l2);
     f.close();
 
-    printf("found ATAN camera model, building rectifier.\n");
-    Undistorter* u = new UndistorterPTAM(configFilename.c_str());
-    if(!u->isValid()) return 0;
+    Undistorter* u;
+    if(isFOVParameters(l1)) {
+        printf("found FOV camera model, building rectifier.\n");
+        u = new UndistorterPTAM(configFilename.c_str());
+    } else if(isRadTanParameters(l1)) {
+        printf("found RadTan camera model, building rectifier.\n");
+        u = new UndistorterOpenCV(configFilename.c_str());
+    } else {
+        std::cerr << "Camera calibration file is in a invalid format" << std::endl;
+    }
     return u;
 }
 
