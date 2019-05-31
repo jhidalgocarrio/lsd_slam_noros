@@ -115,6 +115,11 @@ void DebugOutput3DWrapper::addPointsToPointCloud(
 void DebugOutput3DWrapper::savePointCloud(std::string filename) {
     std::cout << "Exporting pointcloud to " << filename << std::endl;
 
+    if(this->pointcloud.size() == 0) {
+        std::cerr << "Point cloud is empty. Nothing is saved" << std::endl;
+        return;
+    }
+
     pcl::io::savePLYFile(filename, this->pointcloud);
 }
 
