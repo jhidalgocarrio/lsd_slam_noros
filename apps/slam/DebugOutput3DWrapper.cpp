@@ -69,15 +69,25 @@ void init_rgbpoint(pcl::PointXYZRGB &point, const Eigen::Vector3f P, const cv::V
 }
 
 
-inline bool isReliable(const float idepth, const float idepth_var, const float threshold = 0.03) {
+inline bool isReliable(const float idepth, const float idepth_var, const float scale,
+                       const float scaled_threshold = 0.001,
+                       const float absolute_threshold = 0.1) {
     if(idepth <= 0) {
         return false;
     }
 
-    const float idepth_std = sqrt(idepth_var);
-    const float depth_squared = 1 / (idepth * idepth);  // = (1 / idepth) * (1 / idepth)
+    float depth = 1 / idepth;
+    float depth4 = std::pow(depth, 4);
 
-    return idepth_std * depth_squared <= threshold;
+    if(idepth_var * depth4 > scaled_threshold) {
+        return false;
+    }
+
+    if(idepth_var * depth4 * scale * scale > absolute_threshold) {
+        return false;
+    }
+
+    return true;
 }
 
 void DebugOutput3DWrapper::addPointsToPointCloud(
@@ -93,7 +103,7 @@ void DebugOutput3DWrapper::addPointsToPointCloud(
             const int index = width * v + u;
             // TODO check idepthVar
 
-            if(!isReliable(idepth[index], idepth_var[index], 0.05)) {
+            if(!isReliable(idepth[index], idepth_var[index], camToWorld.scale())) {
                 continue;
             }
 
