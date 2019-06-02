@@ -65,6 +65,7 @@ RUN git clone https://github.com/RainerKuemmerle/g2o.git \
 
 WORKDIR $WORKSPACE
 
+RUN apt-get update
 RUN apt-get -y install libboost-all-dev freeglut3-dev libglew-dev libpcl-dev
 
 # build in a single process since it seems parallel build doesn't contribute to the speed
