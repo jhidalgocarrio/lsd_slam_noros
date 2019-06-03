@@ -26,7 +26,6 @@
 
 #define GL_GLEXT_PROTOTYPES
 
-#include <GL/glut.h>
 #include <opencv2/opencv.hpp>
 #include <opencv/highgui.h>
 
@@ -130,7 +129,7 @@ void DebugOutput3DWrapper::savePointCloud(std::string filename) {
         return;
     }
 
-    pcl::io::savePLYFile(filename, this->pointcloud);
+    pcl::io::savePCDFile(filename, this->pointcloud);
 }
 
 
