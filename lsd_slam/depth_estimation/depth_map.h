@@ -21,13 +21,12 @@
 #pragma once
 #include <chrono>
 #include <deque>
-#include <Eigen/Core>
-
 #include "util/eigen_core_include.h"
 #include "opencv2/core/core.hpp"
 #include "util/settings.h"
 #include "util/index_thread_reduce.h"
 #include "util/sophus_util.h"
+
 
 
 namespace lsd_slam
@@ -106,9 +105,7 @@ public:
 private:
     // camera matrix etc.
     Eigen::Matrix3f K, KInv;
-    Eigen::Vector2f focal_length, offset;
-    float fx,fy;
-
+    float fx,fy,cx,cy;
     float fxi,fyi,cxi,cyi;
     int width, height;
 
@@ -132,30 +129,31 @@ private:
     DepthMapPixelHypothesis* currentDepthMap;
     int* validityIntegralBuffer;
 
-    bool isIn2Sigma(const Eigen::Vector2f &p, const Eigen::Vector2f &epn, const float rescaleFactor);
-    bool isInExclusiveImageRange(Eigen::Vector2f x, float margin=0);
+
 
     // ============ internal functions ==================================================
     // does the line-stereo seeking.
     // takes a lot of parameters, because they all have been pre-computed before.
-    //
-    float doLineStereo(
-        const Eigen::Vector2f &p, const Eigen::Vector2f epn,
+    inline float doLineStereo(
+        const float u, const float v, const float epxn, const float epyn,
         const float min_idepth, const float prior_idepth, float max_idepth,
         const Frame* const referenceFrame, const float* referenceFrameImage,
         float &result_idepth, float &result_var, float &result_eplLength,
-        RunningStats* stats);
+        RunningStats* const stats);
+
 
     void propagateDepth(Frame* new_keyframe);
 
+
     void observeDepth();
     void observeDepthRow(int yMin, int yMax, RunningStats* stats);
-
-    bool observeDepthCreate(const Eigen::Vector2i &p, const int &idx, RunningStats* const &stats);
-    bool observeDepthUpdate(const Eigen::Vector2i &p, const int &idx,
+    bool observeDepthCreate(const int &x, const int &y, const int &idx,
+                            RunningStats* const &stats);
+    bool observeDepthUpdate(const int &x, const int &y, const int &idx,
                             const float* keyFrameMaxGradBuf, RunningStats* const &stats);
-    bool makeAndCheckEPL(const Eigen::Vector2f &p, const Frame* const ref,
-                         Eigen::Vector2f &pep, RunningStats* const stats);
+    bool makeAndCheckEPL(const int x, const int y, const Frame* const ref,
+                         float* pepx, float* pepy, RunningStats* const stats);
+
 
     void regularizeDepthMap(bool removeOcclusion, int validityTH);
     template<bool removeOcclusions> void regularizeDepthMapRow(int validityTH,

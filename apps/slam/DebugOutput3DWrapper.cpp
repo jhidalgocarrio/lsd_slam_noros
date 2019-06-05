@@ -108,7 +108,7 @@ void DebugOutput3DWrapper::addPointsToPointCloud(
 
             Eigen::Matrix<float, 3,1> P;
             P = projection.inv_projection(u, v, 1/idepth[index]);
-            P = (camToWorld * P.cast<double>()).cast<float>();
+            P = camToWorld.cast<float>() * P;
 
             pcl::PointXYZRGB point;
             init_rgbpoint(point, P, image.at<cv::Vec3b>(v, u));
