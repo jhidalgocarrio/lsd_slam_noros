@@ -65,6 +65,9 @@ RUN git clone https://github.com/RainerKuemmerle/g2o.git \
 
 WORKDIR $WORKSPACE
 
+# PCL requires you to set timezone if you don't write this
+ENV DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update
 RUN apt-get -y install libboost-all-dev freeglut3-dev libglew-dev libpcl-dev
 
