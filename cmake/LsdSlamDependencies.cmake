@@ -9,7 +9,7 @@ else()
   find_package(Boost REQUIRED COMPONENTS system thread atomic)
 endif()
 if(Boost_FOUND)
-  include_directories(${Boost_INCLUDE_DIRS})
+  include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
   cull_library_paths(Boost_LIBRARIES)
   set(LsdSlam_EXTERNAL_LIBS ${LsdSlam_EXTERNAL_LIBS} ${Boost_LIBRARIES})
   link_directories(${Boost_LIBRARY_DIR})
@@ -21,7 +21,7 @@ endif(Boost_FOUND)
 ##  OpenCV
 find_package(OpenCV REQUIRED)
 get_filename_component(OpenCV_BINARY_DIR "${OpenCV_LIB_DIR}/../bin" ABSOLUTE)
-include_directories(${OpenCV_INCLUDE_DIRS})
+include_directories(SYSTEM ${OpenCV_INCLUDE_DIRS})
 cull_library_paths(OpenCV_LIBRARIES)
 list(APPEND LsdSlam_EXTERNAL_LIBS ${OpenCV_LIBRARIES})
 link_directories(${OpenCV_LIB_DIR})
@@ -66,7 +66,7 @@ if(APPLE)
 else()
   link_directories(${G2O_ROOT}/lib)
 endif()
-include_directories(${G2O_INCLUDE_DIR})
+include_directories(SYSTEM ${G2O_INCLUDE_DIR})
 cull_library_paths(G2O_LIBRARIES)
 list(APPEND LsdSlam_EXTERNAL_LIBS ${G2O_LIBRARIES})
 
@@ -76,27 +76,27 @@ find_path(EIGEN3_INCLUDE_DIR NAMES signature_of_eigen3_matrix_library
           PATHS include
           PATH_SUFFIXES eigen3 include/eigen3)
 
-include_directories(${EIGEN3_INCLUDE_DIR})
+include_directories(SYSTEM ${EIGEN3_INCLUDE_DIR})
 
 # OpenGL
 find_package(OpenGL)
 lsd_slam_print_status("Found OpenGL ? ${OPENGL_FOUND}")
 if(OPENGL_FOUND)
   lsd_slam_print_status("OpenGL INCLUDE: ${OPENGL_INCLUDE_DIR}")
-  include_directories(${OPENGL_INCLUDE_DIR})
+  include_directories(SYSTEM ${OPENGL_INCLUDE_DIR})
   list(APPEND LsdSlam_EXTERNAL_LIBS ${OPENGL_LIBRARIES})
 endif()
 
 # GLUT
 find_package(GLUT)
 if(GLUT_FOUND)
-  include_directories(${GLUT_INCLUDE_DIR})
+  include_directories(SYSTEM ${GLUT_INCLUDE_DIR})
   list(APPEND LsdSlam_EXTERNAL_LIBS ${GLUT_LIBRARIES})
 endif()
 
 # GLEW
 find_package(GLEW)
 if(GLEW_FOUND)
-  include_directories(${GLEW_INCLUDE_DIR})
+  include_directories(SYSTEM ${GLEW_INCLUDE_DIR})
   list(APPEND LsdSlam_EXTERNAL_LIBS ${GLEW_LIBRARIES})
 endif()
