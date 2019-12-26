@@ -1769,17 +1769,16 @@ inline float DepthMap::doLineStereo(
 
 
     float cpx = pFar[0];
-    float cpy =  pFar[1];
+    float cpy = pFar[1];
 
-    float val_cp_m2 = getInterpolatedElement(referenceFrameImage,cpx-2*incx,
-                      cpy-2*incy, width);
-    float val_cp_m1 = getInterpolatedElement(referenceFrameImage,cpx-incx,
-                      cpy-incy, width);
-    float val_cp = getInterpolatedElement(referenceFrameImage,cpx, cpy, width);
-    float val_cp_p1 = getInterpolatedElement(referenceFrameImage,cpx+incx,
-                      cpy+incy, width);
-    float val_cp_p2;
-
+    std::vector<float> vals_cp(5);
+    vals_cp[0] = getInterpolatedElement(referenceFrameImage,cpx-2*incx,
+                cpy-2*incy, width);
+    vals_cp[1] = getInterpolatedElement(referenceFrameImage,cpx-incx,
+                cpy-incy, width);
+    vals_cp[2] = getInterpolatedElement(referenceFrameImage,cpx, cpy, width);
+    vals_cp[3] = getInterpolatedElement(referenceFrameImage,cpx+incx,
+                cpy+incy, width);
 
 
     /*
@@ -1825,7 +1824,7 @@ inline float DepthMap::doLineStereo(
             || loopCounter == 0)
     {
         // interpolate one new point
-        val_cp_p2 = getInterpolatedElement(referenceFrameImage,cpx+2*incx, cpy+2*incy,
+        vals_cp[4] = getInterpolatedElement(referenceFrameImage,cpx+2*incx, cpy+2*incy,
                                            width);
 
 
@@ -1834,29 +1833,29 @@ inline float DepthMap::doLineStereo(
         if(loopCounter%2==0)
         {
             // calc error and accumulate sums.
-            e1A = val_cp_p2 - realVal_p2;
+            e1A = vals_cp[4] - realVal_p2;
             ee += e1A*e1A;
-            e2A = val_cp_p1 - realVal_p1;
+            e2A = vals_cp[3] - realVal_p1;
             ee += e2A*e2A;
-            e3A = val_cp - realVal;
+            e3A = vals_cp[2] - realVal;
             ee += e3A*e3A;
-            e4A = val_cp_m1 - realVal_m1;
+            e4A = vals_cp[1] - realVal_m1;
             ee += e4A*e4A;
-            e5A = val_cp_m2 - realVal_m2;
+            e5A = vals_cp[0] - realVal_m2;
             ee += e5A*e5A;
         }
         else
         {
             // calc error and accumulate sums.
-            e1B = val_cp_p2 - realVal_p2;
+            e1B = vals_cp[4] - realVal_p2;
             ee += e1B*e1B;
-            e2B = val_cp_p1 - realVal_p1;
+            e2B = vals_cp[3] - realVal_p1;
             ee += e2B*e2B;
-            e3B = val_cp - realVal;
+            e3B = vals_cp[2] - realVal;
             ee += e3B*e3B;
-            e4B = val_cp_m1 - realVal_m1;
+            e4B = vals_cp[1] - realVal_m1;
             ee += e4B*e4B;
-            e5B = val_cp_m2 - realVal_m2;
+            e5B = vals_cp[0] - realVal_m2;
             ee += e5B*e5B;
         }
 
@@ -1904,10 +1903,10 @@ inline float DepthMap::doLineStereo(
 
         // shift everything one further.
         eeLast = ee;
-        val_cp_m2 = val_cp_m1;
-        val_cp_m1 = val_cp;
-        val_cp = val_cp_p1;
-        val_cp_p1 = val_cp_p2;
+        vals_cp[0] = vals_cp[1];
+        vals_cp[1] = vals_cp[2];
+        vals_cp[2] = vals_cp[3];
+        vals_cp[3] = vals_cp[4];
 
         if(enablePrintDebugInfo) stats->num_stereo_comparisons++;
 
