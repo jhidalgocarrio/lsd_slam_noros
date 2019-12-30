@@ -1577,7 +1577,7 @@ int DepthMap::debugPlotDepthMap()
 // mat: NEW image
 // KinvP: point in OLD image (Kinv * (u_old, v_old, 1)), projected
 // trafo: x_old = trafo * x_new; (from new to old image)
-// realVal: descriptor in OLD image.
+// real_val[2]: descriptor in OLD image.
 // returns: result_idepth : point depth in new camera's coordinate system
 // returns: result_u/v : point's coordinates in new camera's coordinate system
 // returns: idepth_var: (approximated) measurement variance of inverse depth of result_point_NEW
@@ -1617,15 +1617,16 @@ inline float DepthMap::doLineStereo(
     }
 
     // calculate values to search for
-    float realVal_p1 = getInterpolatedElement(activeKeyFrameImageData,
-                       u + epxn*rescaleFactor, v + epyn*rescaleFactor, width);
-    float realVal_m1 = getInterpolatedElement(activeKeyFrameImageData,
-                       u - epxn*rescaleFactor, v - epyn*rescaleFactor, width);
-    float realVal = getInterpolatedElement(activeKeyFrameImageData,u, v, width);
-    float realVal_m2 = getInterpolatedElement(activeKeyFrameImageData,
-                       u - 2*epxn*rescaleFactor, v - 2*epyn*rescaleFactor, width);
-    float realVal_p2 = getInterpolatedElement(activeKeyFrameImageData,
-                       u + 2*epxn*rescaleFactor, v + 2*epyn*rescaleFactor, width);
+    std::vector<float> real_val(5);
+    real_val[3] = getInterpolatedElement(activeKeyFrameImageData,
+                 u + epxn*rescaleFactor, v + epyn*rescaleFactor, width);
+    real_val[1] = getInterpolatedElement(activeKeyFrameImageData,
+                 u - epxn*rescaleFactor, v - epyn*rescaleFactor, width);
+    real_val[2] = getInterpolatedElement(activeKeyFrameImageData,u, v, width);
+    real_val[0] = getInterpolatedElement(activeKeyFrameImageData,
+                 u - 2*epxn*rescaleFactor, v - 2*epyn*rescaleFactor, width);
+    real_val[4] = getInterpolatedElement(activeKeyFrameImageData,
+                 u + 2*epxn*rescaleFactor, v + 2*epyn*rescaleFactor, width);
 
 
 
@@ -1833,29 +1834,29 @@ inline float DepthMap::doLineStereo(
         if(loopCounter%2==0)
         {
             // calc error and accumulate sums.
-            e1A = vals_cp[4] - realVal_p2;
+            e1A = vals_cp[4] - real_val[4];
             ee += e1A*e1A;
-            e2A = vals_cp[3] - realVal_p1;
+            e2A = vals_cp[3] - real_val[3];
             ee += e2A*e2A;
-            e3A = vals_cp[2] - realVal;
+            e3A = vals_cp[2] - real_val[2];
             ee += e3A*e3A;
-            e4A = vals_cp[1] - realVal_m1;
+            e4A = vals_cp[1] - real_val[1];
             ee += e4A*e4A;
-            e5A = vals_cp[0] - realVal_m2;
+            e5A = vals_cp[0] - real_val[0];
             ee += e5A*e5A;
         }
         else
         {
             // calc error and accumulate sums.
-            e1B = vals_cp[4] - realVal_p2;
+            e1B = vals_cp[4] - real_val[4];
             ee += e1B*e1B;
-            e2B = vals_cp[3] - realVal_p1;
+            e2B = vals_cp[3] - real_val[3];
             ee += e2B*e2B;
-            e3B = vals_cp[2] - realVal;
+            e3B = vals_cp[2] - real_val[2];
             ee += e3B*e3B;
-            e4B = vals_cp[1] - realVal_m1;
+            e4B = vals_cp[1] - real_val[1];
             ee += e4B*e4B;
-            e5B = vals_cp[0] - realVal_m2;
+            e5B = vals_cp[0] - real_val[0];
             ee += e5B*e5B;
         }
 
@@ -2019,17 +2020,17 @@ inline float DepthMap::doLineStereo(
     }
 
 
-    // sampleDist is the distance in pixel at which the realVal's were sampled
+    // sampleDist is the distance in pixel at which the real_val[2]'s were sampled
     float sampleDist = GRADIENT_SAMPLE_DIST*rescaleFactor;
 
     float gradAlongLine = 0;
-    float tmp = realVal_p2 - realVal_p1;
+    float tmp = real_val[4] - real_val[3];
     gradAlongLine+=tmp*tmp;
-    tmp = realVal_p1 - realVal;
+    tmp = real_val[3] - real_val[2];
     gradAlongLine+=tmp*tmp;
-    tmp = realVal - realVal_m1;
+    tmp = real_val[2] - real_val[1];
     gradAlongLine+=tmp*tmp;
-    tmp = realVal_m1 - realVal_m2;
+    tmp = real_val[1] - real_val[0];
     gradAlongLine+=tmp*tmp;
 
     gradAlongLine /= sampleDist*sampleDist;
