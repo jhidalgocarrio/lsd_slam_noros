@@ -1815,14 +1815,15 @@ inline float DepthMap::doLineStereo(
 
 
     // walk in equally sized steps, starting at depth=infinity.
-    int loopCounter = 0;
     float best_match_x = -1;
     float best_match_y = -1;
     float best_match_err = 1e50;
     float second_best_match_err = 1e50;
 
     // best pre and post errors.
-    float best_match_errPre=NAN, best_match_errPost=NAN, best_match_DiffErrPre=NAN,
+    float best_match_errPre=NAN,
+          best_match_errPost=NAN,
+          best_match_DiffErrPre=NAN,
           best_match_DiffErrPost=NAN;
     bool bestWasLastLoop = false;
 
@@ -1832,16 +1833,19 @@ inline float DepthMap::doLineStereo(
     Eigen::VectorXf eA(5), eB(5);
 
     int arg_best=-1, arg_second_best =-1;
-    while(((incx < 0) == (cpx > pClose[0]) && (incy < 0) == (cpy > pClose[1]))
-            || loopCounter == 0)
-    {
+
+    for (int i = 0; ; i++) {
+        if(not ((incx < 0) == (cpx > pClose[0]) && (incy < 0) == (cpy > pClose[1]))) {
+            break;
+        }
+
         // interpolate one new point
         vals_cp[4] = getInterpolatedElement(referenceFrameImage,
                                             cpx+2*incx, cpy+2*incy, width);
 
         // hacky but fast way to get error and differential error: switch buffer variables for last loop.
         // calc error and accumulate sums.
-        if(loopCounter%2==0) {
+        if(i%2==0) {
             eA = vals_cp - real_val;
         } else {
             eB = vals_cp - real_val;
@@ -1853,12 +1857,12 @@ inline float DepthMap::doLineStereo(
         if(ee < best_match_err)
         {
             // put to second-best
-            second_best_match_err=best_match_err;
+            second_best_match_err = best_match_err;
             arg_second_best = arg_best;
 
             // set best.
             best_match_err = ee;
-            arg_best = loopCounter;
+            arg_best = i;
 
             best_match_errPre = eeLast;
             best_match_DiffErrPre = eA.dot(eB);
@@ -1868,12 +1872,10 @@ inline float DepthMap::doLineStereo(
             best_match_x = cpx;
             best_match_y = cpy;
             bestWasLastLoop = true;
-        }
-        // otherwise: the last might be the current winner, in which case i have to save these values.
-        else
-        {
-            if(bestWasLastLoop)
-            {
+        } else {
+        // otherwise: the last might be the current winner, 
+        // in which case i have to save these values.
+            if(bestWasLastLoop) {
                 best_match_errPost = ee;
                 best_match_DiffErrPost = eA.dot(eB);
                 bestWasLastLoop = false;
@@ -1881,10 +1883,9 @@ inline float DepthMap::doLineStereo(
 
             // collect second-best:
             // just take the best of all that are NOT equal to current best.
-            if(ee < second_best_match_err)
-            {
+            if(ee < second_best_match_err) {
                 second_best_match_err=ee;
-                arg_second_best = loopCounter;
+                arg_second_best = i;
             }
         }
 
@@ -1899,8 +1900,6 @@ inline float DepthMap::doLineStereo(
 
         cpx += incx;
         cpy += incy;
-
-        loopCounter++;
     }
 
     // if error too big, will return -3, otherwise -2.
