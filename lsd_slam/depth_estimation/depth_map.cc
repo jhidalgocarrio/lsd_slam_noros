@@ -591,8 +591,9 @@ void DepthMap::propagateDepth(Frame* new_keyframe)
 
             if(trackingWasGood != 0)
             {
-                if(!trackingWasGood[(x >> SE3TRACKING_MIN_LEVEL) + (width >>
-                                                                 SE3TRACKING_MIN_LEVEL)*(y >> SE3TRACKING_MIN_LEVEL)]
+                if(!trackingWasGood[(x >> SE3TRACKING_MIN_LEVEL) +
+                                    (width >> SE3TRACKING_MIN_LEVEL) *
+                                    (y >> SE3TRACKING_MIN_LEVEL)]
                         || destAbsGrad < MIN_ABS_GRAD_DECREASE)
                 {
                     if(enablePrintDebugInfo) runningStats.num_prop_removed_colorDiff++;
@@ -1586,7 +1587,7 @@ int DepthMap::debugPlotDepthMap()
 // mat: NEW image
 // KinvP: point in OLD image (Kinv * (u_old, v_old, 1)), projected
 // trafo: x_old = trafo * x_new; (from new to old image)
-// real_val[2]: descriptor in OLD image.
+// key_intensities[2]: descriptor in OLD image.
 // returns: result_idepth : point depth in new camera's coordinate system
 // returns: result_u/v : point's coordinates in new camera's coordinate system
 // returns: idepth_var: (approximated) measurement variance of inverse depth of result_point_NEW
@@ -1626,19 +1627,19 @@ inline float DepthMap::doLineStereo(
     }
 
     // calculate values to search for
-    Eigen::VectorXf real_val(5);
-    real_val[3] = getInterpolatedElement(activeKeyFrameImageData,
-                 u + epxn*rescaleFactor, v + epyn*rescaleFactor, width);
-    real_val[1] = getInterpolatedElement(activeKeyFrameImageData,
-                 u - epxn*rescaleFactor, v - epyn*rescaleFactor, width);
-    real_val[2] = getInterpolatedElement(activeKeyFrameImageData,u, v, width);
-    real_val[0] = getInterpolatedElement(activeKeyFrameImageData,
+    Eigen::VectorXf key_intensities(5);
+    key_intensities[0] = getInterpolatedElement(activeKeyFrameImageData,
                  u - 2*epxn*rescaleFactor, v - 2*epyn*rescaleFactor, width);
-    real_val[4] = getInterpolatedElement(activeKeyFrameImageData,
+    key_intensities[1] = getInterpolatedElement(activeKeyFrameImageData,
+                 u - epxn*rescaleFactor, v - epyn*rescaleFactor, width);
+    key_intensities[2] = getInterpolatedElement(activeKeyFrameImageData,
+                 u, v, width);
+    key_intensities[3] = getInterpolatedElement(activeKeyFrameImageData,
+                 u + epxn*rescaleFactor, v + epyn*rescaleFactor, width);
+    key_intensities[4] = getInterpolatedElement(activeKeyFrameImageData,
                  u + 2*epxn*rescaleFactor, v + 2*epyn*rescaleFactor, width);
 
 //	if(referenceFrame->K_otherToThis_t[2] * max_idepth + pInf[2] < 0.01)
-
 
     Eigen::Vector3f pClose = pInf + referenceFrame->K_otherToThis_t*max_idepth;
     // if the assumed close-point lies behind the
@@ -1647,8 +1648,8 @@ inline float DepthMap::doLineStereo(
         max_idepth = (0.001-pInf[2]) / referenceFrame->K_otherToThis_t[2];
         pClose = pInf + referenceFrame->K_otherToThis_t*max_idepth;
     }
-    pClose = pClose /
-             pClose[2]; // pos in new image of point (xy), assuming max_idepth
+    // pos in new image of point (xy), assuming max_idepth
+    pClose = pClose / pClose[2];
 
     Eigen::Vector3f pFar = pInf + referenceFrame->K_otherToThis_t*min_idepth;
     // if the assumed far-point lies behind the image or closter than the near-point,
@@ -1662,7 +1663,7 @@ inline float DepthMap::doLineStereo(
 
 
     // check for nan due to eg division by zero.
-    if(std::isnan((float)(pFar[0]+pClose[0])))
+    if(std::isnan((float)(pFar[0] + pClose[0])))
         return -4;
 
     // calculate increments in which we will step through the epipolar line.
@@ -1674,8 +1675,8 @@ inline float DepthMap::doLineStereo(
 
     if(eplLength > MAX_EPL_LENGTH_CROP)
     {
-        pClose[0] = pFar[0] + incx*MAX_EPL_LENGTH_CROP/eplLength;
-        pClose[1] = pFar[1] + incy*MAX_EPL_LENGTH_CROP/eplLength;
+        pClose[0] = pFar[0] + incx * MAX_EPL_LENGTH_CROP / eplLength;
+        pClose[1] = pFar[1] + incy * MAX_EPL_LENGTH_CROP / eplLength;
     }
 
     incx *= GRADIENT_SAMPLE_DIST/eplLength;
@@ -1778,14 +1779,14 @@ inline float DepthMap::doLineStereo(
     float cpx = pFar[0];
     float cpy = pFar[1];
 
-    Eigen::VectorXf vals_cp(5);
-    vals_cp[0] = getInterpolatedElement(referenceFrameImage,
+    Eigen::VectorXf ref_intensities(5);
+    ref_intensities[0] = getInterpolatedElement(referenceFrameImage,
                                         cpx-2*incx, cpy-2*incy, width);
-    vals_cp[1] = getInterpolatedElement(referenceFrameImage,
+    ref_intensities[1] = getInterpolatedElement(referenceFrameImage,
                                         cpx-incx, cpy-incy, width);
-    vals_cp[2] = getInterpolatedElement(referenceFrameImage,
+    ref_intensities[2] = getInterpolatedElement(referenceFrameImage,
                                         cpx, cpy, width);
-    vals_cp[3] = getInterpolatedElement(referenceFrameImage,
+    ref_intensities[3] = getInterpolatedElement(referenceFrameImage,
                                         cpx+incx, cpy+incy, width);
 
 
@@ -1835,18 +1836,19 @@ inline float DepthMap::doLineStereo(
         }
 
         // interpolate one new point
-        vals_cp[4] = getInterpolatedElement(referenceFrameImage,
+        ref_intensities[4] = getInterpolatedElement(referenceFrameImage,
                                             cpx+2*incx, cpy+2*incy, width);
 
-        // hacky but fast way to get error and differential error: switch buffer variables for last loop.
+        // hacky but fast way to get error and differential error:
+        // switch buffer variables for last loop.
         // calc error and accumulate sums.
-        if(i%2==0) {
-            eA = vals_cp - real_val;
+        if(i % 2 == 0) {
+            eA = ref_intensities - key_intensities;
         } else {
-            eB = vals_cp - real_val;
+            eB = ref_intensities - key_intensities;
         }
 
-        float error = (vals_cp - real_val).squaredNorm();
+        float error = (ref_intensities - key_intensities).squaredNorm();
         // do I have a new winner??
         // if so: set.
         if(error < curr_error) {
@@ -1883,10 +1885,10 @@ inline float DepthMap::doLineStereo(
 
         // shift everything one further.
         prev_error_ = error;
-        vals_cp[0] = vals_cp[1];
-        vals_cp[1] = vals_cp[2];
-        vals_cp[2] = vals_cp[3];
-        vals_cp[3] = vals_cp[4];
+        ref_intensities[0] = ref_intensities[1];
+        ref_intensities[1] = ref_intensities[2];
+        ref_intensities[2] = ref_intensities[3];
+        ref_intensities[3] = ref_intensities[4];
 
         if(enablePrintDebugInfo) stats->num_stereo_comparisons++;
 
@@ -1949,7 +1951,6 @@ inline float DepthMap::doLineStereo(
             if(enablePrintDebugInfo) stats->num_stereo_invalid_noCrossing++;
         }
 
-
         // DO interpolation!
         // minimum occurs at zero-crossing of gradient, which is a straight line => easy to compute.
         // the error at that point is also computed by just integrating.
@@ -1973,10 +1974,10 @@ inline float DepthMap::doLineStereo(
     }
 
 
-    // sampleDist is the distance in pixel at which the real_val[2]'s were sampled
+    // sampleDist is the distance in pixel at which the key_intensities[2]'s were sampled
     float sampleDist = GRADIENT_SAMPLE_DIST*rescaleFactor;
 
-    float gradAlongLine = calc_grad_along_line(real_val, sampleDist);
+    float gradAlongLine = calc_grad_along_line(key_intensities, sampleDist);
 
     // check if interpolated error is OK. use evil hack to allow more error if there is a lot of gradient.
     if(curr_error > (float)MAX_ERROR_STEREO + sqrtf(gradAlongLine)*20)
