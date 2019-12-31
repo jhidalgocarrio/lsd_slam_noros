@@ -1835,7 +1835,8 @@ inline float DepthMap::doLineStereo(
     int arg_best=-1, arg_second_best =-1;
 
     for (int i = 0; ; i++) {
-        if(not ((incx < 0) == (cpx > pClose[0]) && (incy < 0) == (cpy > pClose[1]))) {
+        if((incx < 0) != (cpx > pClose[0]) ||
+           (incy < 0) != (cpy > pClose[1])) {
             break;
         }
 
@@ -1873,7 +1874,7 @@ inline float DepthMap::doLineStereo(
             best_match_y = cpy;
             bestWasLastLoop = true;
         } else {
-        // otherwise: the last might be the current winner, 
+        // otherwise: the last might be the current winner,
         // in which case i have to save these values.
             if(bestWasLastLoop) {
                 best_match_errPost = ee;
@@ -1884,7 +1885,7 @@ inline float DepthMap::doLineStereo(
             // collect second-best:
             // just take the best of all that are NOT equal to current best.
             if(ee < second_best_match_err) {
-                second_best_match_err=ee;
+                second_best_match_err = ee;
                 arg_second_best = i;
             }
         }
@@ -1933,43 +1934,29 @@ inline float DepthMap::doLineStereo(
         bool interpPre = false;
 
         // if one is oob: return false.
-        if(enablePrintDebugInfo && (best_match_errPre < 0 || best_match_errPost < 0))
-        {
+        if(enablePrintDebugInfo && (best_match_errPre < 0 || best_match_errPost < 0)) {
             stats->num_stereo_invalid_atEnd++;
-        }
-
-
-        // - if zero-crossing occurs exactly in between (gradient Inconsistent),
-        else if((gradPost_this < 0) ^ (gradPre_this < 0))
-        {
-            // return exact pos, if both central gradients are small compared to their counterpart.
-            if(enablePrintDebugInfo
-                    && (gradPost_this*gradPost_this > 0.1f*0.1f*gradPost_post*gradPost_post ||
-                        gradPre_this*gradPre_this > 0.1f*0.1f*gradPre_pre*gradPre_pre))
+        } else if((gradPost_this < 0) ^ (gradPre_this < 0)) {
+            // - if zero-crossing occurs exactly in between (gradient Inconsistent),
+            // return exact pos, if both central gradients are small
+            // compared to their counterpart.
+            if(enablePrintDebugInfo &&
+              (gradPost_this*gradPost_this > 0.1f*0.1f*gradPost_post*gradPost_post ||
+               gradPre_this*gradPre_this > 0.1f*0.1f*gradPre_pre*gradPre_pre))
                 stats->num_stereo_invalid_inexistantCrossing++;
-        }
-
+        } else if((gradPre_pre < 0) ^ (gradPre_this < 0)) {
         // if pre has zero-crossing
-        else if((gradPre_pre < 0) ^ (gradPre_this < 0))
-        {
             // if post has zero-crossing
-            if((gradPost_post < 0) ^ (gradPost_this < 0))
-            {
+            if((gradPost_post < 0) ^ (gradPost_this < 0)) {
                 if(enablePrintDebugInfo) stats->num_stereo_invalid_twoCrossing++;
-            }
-            else
+            } else {
                 interpPre = true;
-        }
-
-        // if post has zero-crossing
-        else if((gradPost_post < 0) ^ (gradPost_this < 0))
-        {
+            }
+        } else if((gradPost_post < 0) ^ (gradPost_this < 0)) {
+            // if post has zero-crossing
             interpPost = true;
-        }
-
-        // if none has zero-crossing
-        else
-        {
+        } else {
+            // if none has zero-crossing
             if(enablePrintDebugInfo) stats->num_stereo_invalid_noCrossing++;
         }
 
@@ -1977,29 +1964,23 @@ inline float DepthMap::doLineStereo(
         // DO interpolation!
         // minimum occurs at zero-crossing of gradient, which is a straight line => easy to compute.
         // the error at that point is also computed by just integrating.
-        if(interpPre)
-        {
+        if(interpPre) {
             float d = gradPre_this / (gradPre_this - gradPre_pre);
             best_match_x -= d*incx;
             best_match_y -= d*incy;
-            best_match_err = best_match_err - 2*d*gradPre_this - (gradPre_pre -
-                             gradPre_this)*d*d;
+            best_match_err = best_match_err - 2*d*gradPre_this
+                           - (gradPre_pre - gradPre_this)*d*d;
             if(enablePrintDebugInfo) stats->num_stereo_interpPre++;
             didSubpixel = true;
-
-        }
-        else if(interpPost)
-        {
+        } else if(interpPost) {
             float d = gradPost_this / (gradPost_this - gradPost_post);
             best_match_x += d*incx;
             best_match_y += d*incy;
-            best_match_err = best_match_err + 2*d*gradPost_this + (gradPost_post -
-                             gradPost_this)*d*d;
+            best_match_err = best_match_err + 2*d*gradPost_this
+                           + (gradPost_post - gradPost_this)*d*d;
             if(enablePrintDebugInfo) stats->num_stereo_interpPost++;
             didSubpixel = true;
-        }
-        else
-        {
+        } else {
             if(enablePrintDebugInfo) stats->num_stereo_interpNone++;
         }
     }
