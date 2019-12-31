@@ -21,7 +21,7 @@
 #pragma once
 #include <chrono>
 #include <deque>
-#include <vector>
+#include <Eigen/Dense>
 
 #include "util/eigen_core_include.h"
 #include "opencv2/core/core.hpp"
@@ -30,11 +30,10 @@
 #include "util/sophus_util.h"
 
 
-
 namespace lsd_slam
 {
 
-float calc_grad_along_line(std::vector<float> &intensities, float interval);
+float calc_grad_along_line(Eigen::VectorXd &intensities, float interval);
 
 typedef std::chrono::high_resolution_clock::time_point timepoint_t;
 
