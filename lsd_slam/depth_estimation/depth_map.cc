@@ -61,8 +61,6 @@ DepthMap::DepthMap(int w, int h, const Eigen::Matrix3f& K)
 
     validityIntegralBuffer =new int[width*height];
 
-
-
     debugImageHypothesisHandling = cv::Mat(h,w, CV_8UC3);
     debugImageHypothesisPropagation = cv::Mat(h,w, CV_8UC3);
     debugImageStereoLines = cv::Mat(h,w, CV_8UC3);
@@ -606,7 +604,8 @@ void DepthMap::propagateDepth(Frame* new_keyframe)
             else
             {
                 float sourceColor = activeKFImageData[x + y*width];
-                float destColor = getInterpolatedElement(newKFImageData, u_new, v_new, width);
+                float destColor = getInterpolatedElement(newKFImageData,
+                                                         u_new, v_new, width);
 
                 float residual = destColor - sourceColor;
 
@@ -1785,13 +1784,14 @@ inline float DepthMap::doLineStereo(
     float cpy = pFar[1];
 
     Eigen::VectorXd vals_cp(5);
-    vals_cp[0] = getInterpolatedElement(referenceFrameImage,cpx-2*incx,
-                cpy-2*incy, width);
-    vals_cp[1] = getInterpolatedElement(referenceFrameImage,cpx-incx,
-                cpy-incy, width);
-    vals_cp[2] = getInterpolatedElement(referenceFrameImage,cpx, cpy, width);
-    vals_cp[3] = getInterpolatedElement(referenceFrameImage,cpx+incx,
-                cpy+incy, width);
+    vals_cp[0] = getInterpolatedElement(referenceFrameImage,
+                                        cpx-2*incx, cpy-2*incy, width);
+    vals_cp[1] = getInterpolatedElement(referenceFrameImage,
+                                        cpx-incx, cpy-incy, width);
+    vals_cp[2] = getInterpolatedElement(referenceFrameImage,
+                                        cpx, cpy, width);
+    vals_cp[3] = getInterpolatedElement(referenceFrameImage,
+                                        cpx+incx, cpy+incy, width);
 
 
     /*
@@ -1829,64 +1829,39 @@ inline float DepthMap::doLineStereo(
     float eeLast = -1; // final error of last comp.
 
     // alternating intermediate vars
-    float e1A=NAN, e1B=NAN, e2A=NAN, e2B=NAN, e3A=NAN, e3B=NAN, e4A=NAN, e4B=NAN,
-          e5A=NAN, e5B=NAN;
+    Eigen::VectorXd eA(5), eB(5);
 
-    int loopCBest=-1, loopCSecond =-1;
+    int arg_best=-1, arg_second_best =-1;
     while(((incx < 0) == (cpx > pClose[0]) && (incy < 0) == (cpy > pClose[1]))
             || loopCounter == 0)
     {
         // interpolate one new point
-        vals_cp[4] = getInterpolatedElement(referenceFrameImage,cpx+2*incx, cpy+2*incy,
-                                           width);
-
+        vals_cp[4] = getInterpolatedElement(referenceFrameImage,
+                                            cpx+2*incx, cpy+2*incy, width);
 
         // hacky but fast way to get error and differential error: switch buffer variables for last loop.
-        float ee = 0;
-        if(loopCounter%2==0)
-        {
-            // calc error and accumulate sums.
-            e1A = vals_cp[4] - real_val[4];
-            ee += e1A*e1A;
-            e2A = vals_cp[3] - real_val[3];
-            ee += e2A*e2A;
-            e3A = vals_cp[2] - real_val[2];
-            ee += e3A*e3A;
-            e4A = vals_cp[1] - real_val[1];
-            ee += e4A*e4A;
-            e5A = vals_cp[0] - real_val[0];
-            ee += e5A*e5A;
-        }
-        else
-        {
-            // calc error and accumulate sums.
-            e1B = vals_cp[4] - real_val[4];
-            ee += e1B*e1B;
-            e2B = vals_cp[3] - real_val[3];
-            ee += e2B*e2B;
-            e3B = vals_cp[2] - real_val[2];
-            ee += e3B*e3B;
-            e4B = vals_cp[1] - real_val[1];
-            ee += e4B*e4B;
-            e5B = vals_cp[0] - real_val[0];
-            ee += e5B*e5B;
+        // calc error and accumulate sums.
+        if(loopCounter%2==0) {
+            eA = vals_cp - real_val;
+        } else {
+            eB = vals_cp - real_val;
         }
 
-
+        float ee = (vals_cp - real_val).squaredNorm();
         // do I have a new winner??
         // if so: set.
         if(ee < best_match_err)
         {
             // put to second-best
             second_best_match_err=best_match_err;
-            loopCSecond = loopCBest;
+            arg_second_best = arg_best;
 
             // set best.
             best_match_err = ee;
-            loopCBest = loopCounter;
+            arg_best = loopCounter;
 
             best_match_errPre = eeLast;
-            best_match_DiffErrPre = e1A*e1B + e2A*e2B + e3A*e3B + e4A*e4B + e5A*e5B;
+            best_match_DiffErrPre = eA.dot(eB);
             best_match_errPost = -1;
             best_match_DiffErrPost = -1;
 
@@ -1900,7 +1875,7 @@ inline float DepthMap::doLineStereo(
             if(bestWasLastLoop)
             {
                 best_match_errPost = ee;
-                best_match_DiffErrPost = e1A*e1B + e2A*e2B + e3A*e3B + e4A*e4B + e5A*e5B;
+                best_match_DiffErrPost = eA.dot(eB);
                 bestWasLastLoop = false;
             }
 
@@ -1909,10 +1884,9 @@ inline float DepthMap::doLineStereo(
             if(ee < second_best_match_err)
             {
                 second_best_match_err=ee;
-                loopCSecond = loopCounter;
+                arg_second_best = loopCounter;
             }
         }
-
 
         // shift everything one further.
         eeLast = ee;
@@ -1938,8 +1912,8 @@ inline float DepthMap::doLineStereo(
 
 
     // check if clear enough winner
-    if(abs(loopCBest - loopCSecond) > 1
-            && MIN_DISTANCE_ERROR_STEREO * best_match_err > second_best_match_err)
+    if(abs(arg_best - arg_second_best) > 1 &&
+       MIN_DISTANCE_ERROR_STEREO * best_match_err > second_best_match_err)
     {
         if(enablePrintDebugInfo) stats->num_stereo_invalid_unclear_winner++;
         return -2;
@@ -2066,7 +2040,6 @@ inline float DepthMap::doLineStereo(
     else
     {
         float oldY = fyi*best_match_y+cyi;
-
         float nominator = (oldY*referenceFrame->otherToThis_t[2] -
                            referenceFrame->otherToThis_t[1]);
         float dot1 = KinvP.dot(referenceFrame->otherToThis_R_row1);
@@ -2077,10 +2050,6 @@ inline float DepthMap::doLineStereo(
                           dot2*referenceFrame->otherToThis_t[1]) / (nominator*nominator);
 
     }
-
-
-
-
 
     if(idnew_best_match < 0)
     {
