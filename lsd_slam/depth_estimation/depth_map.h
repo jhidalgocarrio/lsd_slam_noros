@@ -33,7 +33,7 @@
 namespace lsd_slam
 {
 
-float calc_grad_along_line(Eigen::VectorXd &intensities, float interval);
+float calc_grad_along_line(Eigen::VectorXf &intensities, float interval);
 
 typedef std::chrono::high_resolution_clock::time_point timepoint_t;
 

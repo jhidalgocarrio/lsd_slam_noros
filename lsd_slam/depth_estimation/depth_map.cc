@@ -39,7 +39,7 @@
 namespace lsd_slam
 {
 
-float calc_grad_along_line(Eigen::VectorXd &intensities, float interval) {
+float calc_grad_along_line(Eigen::VectorXf &intensities, float interval) {
     float grad_along_line = 0;
     for (int i = 0; i < intensities.size() - 1; i++) {
         float d = intensities[i+1] - intensities[i];
@@ -1628,7 +1628,7 @@ inline float DepthMap::doLineStereo(
     }
 
     // calculate values to search for
-    Eigen::VectorXd real_val(5);
+    Eigen::VectorXf real_val(5);
     real_val[3] = getInterpolatedElement(activeKeyFrameImageData,
                  u + epxn*rescaleFactor, v + epyn*rescaleFactor, width);
     real_val[1] = getInterpolatedElement(activeKeyFrameImageData,
@@ -1783,7 +1783,7 @@ inline float DepthMap::doLineStereo(
     float cpx = pFar[0];
     float cpy = pFar[1];
 
-    Eigen::VectorXd vals_cp(5);
+    Eigen::VectorXf vals_cp(5);
     vals_cp[0] = getInterpolatedElement(referenceFrameImage,
                                         cpx-2*incx, cpy-2*incy, width);
     vals_cp[1] = getInterpolatedElement(referenceFrameImage,
@@ -1829,7 +1829,7 @@ inline float DepthMap::doLineStereo(
     float eeLast = -1; // final error of last comp.
 
     // alternating intermediate vars
-    Eigen::VectorXd eA(5), eB(5);
+    Eigen::VectorXf eA(5), eB(5);
 
     int arg_best=-1, arg_second_best =-1;
     while(((incx < 0) == (cpx > pClose[0]) && (incy < 0) == (cpy > pClose[1]))
