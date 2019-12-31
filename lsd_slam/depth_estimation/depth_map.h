@@ -21,6 +21,8 @@
 #pragma once
 #include <chrono>
 #include <deque>
+#include <vector>
+
 #include "util/eigen_core_include.h"
 #include "opencv2/core/core.hpp"
 #include "util/settings.h"
@@ -31,6 +33,8 @@
 
 namespace lsd_slam
 {
+
+float calc_grad_along_line(std::vector<float> &intensities, float interval);
 
 typedef std::chrono::high_resolution_clock::time_point timepoint_t;
 

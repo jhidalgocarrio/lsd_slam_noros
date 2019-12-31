@@ -37,6 +37,16 @@
 namespace lsd_slam
 {
 
+float calc_grad_along_line(std::vector<float> &intensities, float interval) {
+    float grad_along_line = 0;
+    for (int i = 0; i < intensities.size() - 1; i++) {
+        float d = intensities[i+1] - intensities[i];
+        grad_along_line += d * d;
+    }
+
+    return grad_along_line / (interval * interval);
+}
+
 DepthMap::DepthMap(int w, int h, const Eigen::Matrix3f& K)
 {
     width = w;
