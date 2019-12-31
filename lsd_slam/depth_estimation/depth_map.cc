@@ -1817,14 +1817,14 @@ inline float DepthMap::doLineStereo(
     // walk in equally sized steps, starting at depth=infinity.
     float best_match_x = -1;
     float best_match_y = -1;
-    float best_match_err = 1e50;
-    float second_best_match_err = 1e50;
+    float error_argmin = 1e50;
+    float error_second_argmin = 1e50;
 
     // best pre and post errors.
-    float best_match_errPre=NAN,
-          best_match_errPost=NAN,
-          best_match_DiffErrPre=NAN,
-          best_match_DiffErrPost=NAN;
+    float error_prev_argmin=NAN,
+          error_next_argmin=NAN,
+          diff_prev_argmin=NAN,
+          diff_next_argmin=NAN;
     bool bestWasLastLoop = false;
 
     float eeLast = -1; // final error of last comp.
@@ -1855,20 +1855,20 @@ inline float DepthMap::doLineStereo(
         float ee = (vals_cp - real_val).squaredNorm();
         // do I have a new winner??
         // if so: set.
-        if(ee < best_match_err)
+        if(ee < error_argmin)
         {
             // put to second-best
-            second_best_match_err = best_match_err;
+            error_second_argmin = error_argmin;
             arg_second_best = arg_best;
 
             // set best.
-            best_match_err = ee;
+            error_argmin = ee;
             arg_best = i;
 
-            best_match_errPre = eeLast;
-            best_match_DiffErrPre = eA.dot(eB);
-            best_match_errPost = -1;
-            best_match_DiffErrPost = -1;
+            error_prev_argmin = eeLast;
+            diff_prev_argmin = eA.dot(eB);
+            error_next_argmin = -1;
+            diff_next_argmin = -1;
 
             best_match_x = cpx;
             best_match_y = cpy;
@@ -1877,15 +1877,15 @@ inline float DepthMap::doLineStereo(
         // otherwise: the last might be the current winner,
         // in which case i have to save these values.
             if(bestWasLastLoop) {
-                best_match_errPost = ee;
-                best_match_DiffErrPost = eA.dot(eB);
+                error_next_argmin = ee;
+                diff_next_argmin = eA.dot(eB);
                 bestWasLastLoop = false;
             }
 
             // collect second-best:
             // just take the best of all that are NOT equal to current best.
-            if(ee < second_best_match_err) {
-                second_best_match_err = ee;
+            if(ee < error_second_argmin) {
+                error_second_argmin = ee;
                 arg_second_best = i;
             }
         }
@@ -1904,7 +1904,7 @@ inline float DepthMap::doLineStereo(
     }
 
     // if error too big, will return -3, otherwise -2.
-    if(best_match_err > 4*(float)MAX_ERROR_STEREO)
+    if(error_argmin > 4*(float)MAX_ERROR_STEREO)
     {
         if(enablePrintDebugInfo) stats->num_stereo_invalid_bigErr++;
         return -3;
@@ -1913,7 +1913,7 @@ inline float DepthMap::doLineStereo(
 
     // check if clear enough winner
     if(abs(arg_best - arg_second_best) > 1 &&
-       MIN_DISTANCE_ERROR_STEREO * best_match_err > second_best_match_err)
+       MIN_DISTANCE_ERROR_STEREO * error_argmin > error_second_argmin)
     {
         if(enablePrintDebugInfo) stats->num_stereo_invalid_unclear_winner++;
         return -2;
@@ -1924,35 +1924,35 @@ inline float DepthMap::doLineStereo(
     {
         // ================== compute exact match =========================
         // compute gradients (they are actually only half the real gradient)
-        float gradPre_pre = -(best_match_errPre - best_match_DiffErrPre);
-        float gradPre_this = +(best_match_err - best_match_DiffErrPre);
-        float gradPost_this = -(best_match_err - best_match_DiffErrPost);
-        float gradPost_post = +(best_match_errPost - best_match_DiffErrPost);
+        float grad_prev_prev = -(error_prev_argmin - diff_prev_argmin);
+        float grad_prev_curr = +(error_argmin - diff_prev_argmin);
+        float grad_next_curr = -(error_argmin - diff_next_argmin);
+        float grad_next_next = +(error_next_argmin - diff_next_argmin);
 
         // final decisions here.
         bool interpPost = false;
         bool interpPre = false;
 
         // if one is oob: return false.
-        if(enablePrintDebugInfo && (best_match_errPre < 0 || best_match_errPost < 0)) {
+        if(enablePrintDebugInfo && (error_prev_argmin < 0 || error_next_argmin < 0)) {
             stats->num_stereo_invalid_atEnd++;
-        } else if((gradPost_this < 0) ^ (gradPre_this < 0)) {
+        } else if((grad_next_curr < 0) ^ (grad_prev_curr < 0)) {
             // - if zero-crossing occurs exactly in between (gradient Inconsistent),
             // return exact pos, if both central gradients are small
             // compared to their counterpart.
             if(enablePrintDebugInfo &&
-              (gradPost_this*gradPost_this > 0.1f*0.1f*gradPost_post*gradPost_post ||
-               gradPre_this*gradPre_this > 0.1f*0.1f*gradPre_pre*gradPre_pre))
+              (grad_next_curr*grad_next_curr > 0.1f*0.1f*grad_next_next*grad_next_next ||
+               grad_prev_curr*grad_prev_curr > 0.1f*0.1f*grad_prev_prev*grad_prev_prev))
                 stats->num_stereo_invalid_inexistantCrossing++;
-        } else if((gradPre_pre < 0) ^ (gradPre_this < 0)) {
+        } else if((grad_prev_prev < 0) ^ (grad_prev_curr < 0)) {
         // if pre has zero-crossing
             // if post has zero-crossing
-            if((gradPost_post < 0) ^ (gradPost_this < 0)) {
+            if((grad_next_next < 0) ^ (grad_next_curr < 0)) {
                 if(enablePrintDebugInfo) stats->num_stereo_invalid_twoCrossing++;
             } else {
                 interpPre = true;
             }
-        } else if((gradPost_post < 0) ^ (gradPost_this < 0)) {
+        } else if((grad_next_next < 0) ^ (grad_next_curr < 0)) {
             // if post has zero-crossing
             interpPost = true;
         } else {
@@ -1965,19 +1965,19 @@ inline float DepthMap::doLineStereo(
         // minimum occurs at zero-crossing of gradient, which is a straight line => easy to compute.
         // the error at that point is also computed by just integrating.
         if(interpPre) {
-            float d = gradPre_this / (gradPre_this - gradPre_pre);
+            float d = grad_prev_curr / (grad_prev_curr - grad_prev_prev);
             best_match_x -= d*incx;
             best_match_y -= d*incy;
-            best_match_err = best_match_err - 2*d*gradPre_this
-                           - (gradPre_pre - gradPre_this)*d*d;
+            error_argmin = error_argmin - 2*d*grad_prev_curr
+                         - (grad_prev_prev - grad_prev_curr)*d*d;
             if(enablePrintDebugInfo) stats->num_stereo_interpPre++;
             didSubpixel = true;
         } else if(interpPost) {
-            float d = gradPost_this / (gradPost_this - gradPost_post);
+            float d = grad_next_curr / (grad_next_curr - grad_next_next);
             best_match_x += d*incx;
             best_match_y += d*incy;
-            best_match_err = best_match_err + 2*d*gradPost_this
-                           + (gradPost_post - gradPost_this)*d*d;
+            error_argmin = error_argmin + 2*d*grad_next_curr
+                         + (grad_next_next - grad_next_curr)*d*d;
             if(enablePrintDebugInfo) stats->num_stereo_interpPost++;
             didSubpixel = true;
         } else {
@@ -1992,7 +1992,7 @@ inline float DepthMap::doLineStereo(
     float gradAlongLine = calc_grad_along_line(real_val, sampleDist);
 
     // check if interpolated error is OK. use evil hack to allow more error if there is a lot of gradient.
-    if(best_match_err > (float)MAX_ERROR_STEREO + sqrtf(gradAlongLine)*20)
+    if(error_argmin > (float)MAX_ERROR_STEREO + sqrtf(gradAlongLine)*20)
     {
         if(enablePrintDebugInfo) stats->num_stereo_invalid_bigErr++;
         return -3;
@@ -2082,7 +2082,7 @@ inline float DepthMap::doLineStereo(
 //			float pixelDistFound = sqrtf((float)((pReal[0]/pReal[2] - best_match_x)*(pReal[0]/pReal[2] - best_match_x)
 //					+ (pReal[1]/pReal[2] - best_match_y)*(pReal[1]/pReal[2] - best_match_y)));
 //
-            float fac = best_match_err / ((float)MAX_ERROR_STEREO + sqrtf(
+            float fac = error_argmin / ((float)MAX_ERROR_STEREO + sqrtf(
                                               gradAlongLine)*20);
 
             cv::Scalar color = cv::Scalar(255*fac, 255-255*fac, 0);// bw
@@ -2104,7 +2104,7 @@ inline float DepthMap::doLineStereo(
 
     result_eplLength = eplLength;
 
-    return best_match_err;
+    return error_argmin;
 }
 
 }
