@@ -101,6 +101,9 @@ endif()
 include(LsdSlamDependencies)
 
 # Thirdparty libs ==============================================================
+# Catch
+include_directories(${LSD_SLAM_DIR}/thirdparty/catch)
+
 # Sophus
 include_directories(${LSD_SLAM_DIR}/thirdparty/Sophus)
 
@@ -133,8 +136,12 @@ add_subdirectory(lsd_slam)
 
 list(APPEND LsdSlam_ALL_LIBRARIES lsd_slam)
 lsd_slam_print_status("LsdSlam_ALL_LIBRARIES After:${LsdSlam_ALL_LIBRARIES}")
+
 # Applications
 add_subdirectory(apps)
+
+# Tests
+add_subdirectory(tests)
 
 # Installation =================================================================
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/LsdSlamConfig.cmake.in"
