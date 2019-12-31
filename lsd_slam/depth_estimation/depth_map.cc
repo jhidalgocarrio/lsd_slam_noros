@@ -1818,8 +1818,8 @@ inline float DepthMap::doLineStereo(
     // best pre and post errors.
     float prev_error=NAN,
           next_error=NAN,
-          diff_prev_argmin=NAN,
-          diff_next_argmin=NAN;
+          prev_diff=NAN,
+          next_diff=NAN;
 
     float prev_error_ = -1; // final error of last comp.
 
@@ -1859,9 +1859,9 @@ inline float DepthMap::doLineStereo(
             argmin = i;
 
             prev_error = prev_error_;
-            diff_prev_argmin = eA.dot(eB);
+            prev_diff = eA.dot(eB);
             next_error = -1;
-            diff_next_argmin = -1;
+            next_diff = -1;
 
             argmin_x = cpx;
             argmin_y = cpy;
@@ -1870,7 +1870,7 @@ inline float DepthMap::doLineStereo(
         // in which case i have to save these values.
             if(i - 1 == argmin) {
                 next_error = error;
-                diff_next_argmin = eA.dot(eB);
+                next_diff = eA.dot(eB);
             }
 
             // collect second-best:
@@ -1910,19 +1910,17 @@ inline float DepthMap::doLineStereo(
         return -2;
     }
 
-    bool didSubpixel = false;
+    // final decisions here.
+    bool interpolate_next = false;
+    bool interpolate_prev = false;
     if(useSubpixelStereo)
     {
         // ================== compute exact match =========================
         // compute gradients (they are actually only half the real gradient)
-        float grad_prev_prev = -(prev_error - diff_prev_argmin);
-        float grad_prev_curr = +(curr_error - diff_prev_argmin);
-        float grad_next_curr = -(curr_error - diff_next_argmin);
-        float grad_next_next = +(next_error - diff_next_argmin);
-
-        // final decisions here.
-        bool interpolate_next = false;
-        bool interpolate_prev = false;
+        float grad_prev_prev = -(prev_error - prev_diff);
+        float grad_prev_curr = +(curr_error - prev_diff);
+        float grad_next_curr = -(curr_error - next_diff);
+        float grad_next_next = +(next_error - next_diff);
 
         // if one is oob: return false.
         if(enablePrintDebugInfo && (prev_error < 0 || next_error < 0)) {
@@ -1962,7 +1960,6 @@ inline float DepthMap::doLineStereo(
             curr_error = curr_error - 2*d*grad_prev_curr
                        - (grad_prev_prev - grad_prev_curr)*d*d;
             if(enablePrintDebugInfo) stats->num_stereo_interpPre++;
-            didSubpixel = true;
         } else if(interpolate_next) {
             float d = grad_next_curr / (grad_next_curr - grad_next_next);
             argmin_x += d*incx;
@@ -1970,7 +1967,6 @@ inline float DepthMap::doLineStereo(
             curr_error = curr_error + 2*d*grad_next_curr
                        + (grad_next_next - grad_next_curr)*d*d;
             if(enablePrintDebugInfo) stats->num_stereo_interpPost++;
-            didSubpixel = true;
         } else {
             if(enablePrintDebugInfo) stats->num_stereo_interpNone++;
         }
@@ -2051,7 +2047,8 @@ inline float DepthMap::doLineStereo(
 
     // final error consists of a small constant part (discretization error),
     // geometric and photometric error.
-    result_var = alpha*alpha*((didSubpixel ? 0.05f : 0.5f)*sampleDist*sampleDist +
+    float coeff = (interpolate_prev || interpolate_next) ? 0.05f : 0.5f;
+    result_var = alpha*alpha*(coeff*sampleDist*sampleDist +
                               geoDispError + photoDispError);	// square to make variance
 
     if(plotStereoImages)
