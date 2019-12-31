@@ -45,6 +45,13 @@ $./scripts/download_tum_mono.sh
 
 The debug window should appear by executing `$./bin/main_on_images data/sequence_$SEQUENCE`.
 
+
+### Run unit tests
+
+```
+$./bin/lsdslam_tests
+```
+
 ## Related Papers
 
 * **LSD-SLAM: Large-Scale Direct Monocular SLAM**, *J. Engel, T. Schöps, D. Cremers*, ECCV '14
