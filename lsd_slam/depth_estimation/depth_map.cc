@@ -1820,9 +1820,8 @@ inline float DepthMap::doLineStereo(
           error_next_argmin=NAN,
           diff_prev_argmin=NAN,
           diff_next_argmin=NAN;
-    bool last_iter_is_argmin = false;
 
-    float eeLast = -1; // final error of last comp.
+    float prev_error = -1; // final error of last comp.
 
     // alternating intermediate vars
     Eigen::VectorXf eA(5), eB(5);
@@ -1847,45 +1846,43 @@ inline float DepthMap::doLineStereo(
             eB = vals_cp - real_val;
         }
 
-        float ee = (vals_cp - real_val).squaredNorm();
+        float error = (vals_cp - real_val).squaredNorm();
         // do I have a new winner??
         // if so: set.
-        if(ee < min_error) {
+        if(error < min_error) {
             // put to second-best
             second_min_error = min_error;
             second_argmin = argmin;
 
             // set best.
-            min_error = ee;
+            min_error = error;
             argmin = i;
 
-            error_prev_argmin = eeLast;
+            error_prev_argmin = prev_error;
             diff_prev_argmin = eA.dot(eB);
             error_next_argmin = -1;
             diff_next_argmin = -1;
 
             argmin_x = cpx;
             argmin_y = cpy;
-            last_iter_is_argmin = true;
         } else {
         // otherwise: the last might be the current winner,
         // in which case i have to save these values.
-            if(last_iter_is_argmin) {
-                error_next_argmin = ee;
+            if(i - 1 == argmin) {
+                error_next_argmin = error;
                 diff_next_argmin = eA.dot(eB);
-                last_iter_is_argmin = false;
             }
 
             // collect second-best:
             // just take the best of all that are NOT equal to current best.
-            if(ee < second_min_error) {
-                second_min_error = ee;
+            if(error < second_min_error) {
+                second_min_error = error;
                 second_argmin = i;
             }
         }
 
         // shift everything one further.
-        eeLast = ee;
+        prev_error = error;
         vals_cp[0] = vals_cp[1];
         vals_cp[1] = vals_cp[2];
         vals_cp[2] = vals_cp[3];
