@@ -2033,25 +2033,14 @@ inline float DepthMap::doLineStereo(
     // sampleDist is the distance in pixel at which the real_val[2]'s were sampled
     float sampleDist = GRADIENT_SAMPLE_DIST*rescaleFactor;
 
-    float gradAlongLine = 0;
-    float tmp = real_val[4] - real_val[3];
-    gradAlongLine+=tmp*tmp;
-    tmp = real_val[3] - real_val[2];
-    gradAlongLine+=tmp*tmp;
-    tmp = real_val[2] - real_val[1];
-    gradAlongLine+=tmp*tmp;
-    tmp = real_val[1] - real_val[0];
-    gradAlongLine+=tmp*tmp;
-
-    gradAlongLine /= sampleDist*sampleDist;
+    float gradAlongLine = calc_grad_along_line(real_val, sampleDist);
 
     // check if interpolated error is OK. use evil hack to allow more error if there is a lot of gradient.
-    if(best_match_err > (float)MAX_ERROR_STEREO + sqrtf( gradAlongLine)*20)
+    if(best_match_err > (float)MAX_ERROR_STEREO + sqrtf(gradAlongLine)*20)
     {
         if(enablePrintDebugInfo) stats->num_stereo_invalid_bigErr++;
         return -3;
     }
-
 
     // ================= calc depth (in KF) ====================
     // * KinvP = Kinv * (x,y,1); where x,y are pixel coordinates of point we search for, in the KF.
