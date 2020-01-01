@@ -607,8 +607,9 @@ void DepthMap::propagateDepth(Frame* new_keyframe)
             else
             {
                 float sourceColor = activeKFImageData[x + y*width];
+                const auto p_((Eigen::Vector2f() << u_new, v_new).finished());
                 float destColor = getInterpolatedElement(newKFImageData,
-                                                         u_new, v_new, width);
+                                                         p_, width);
 
                 float residual = destColor - sourceColor;
 
@@ -1616,7 +1617,7 @@ inline float DepthMap::doLineStereo(
     if(enablePrintDebugInfo) stats->num_stereo_calls++;
 
     // calculate epipolar line start and end point in old image
-    Eigen::Vector3f KinvP = Eigen::Vector3f(fxi*u+cxi,fyi*v+cyi,1);
+    Eigen::Vector3f KinvP = Eigen::Vector3f(fxi*u+cxi, fyi*v+cyi, 1);
     Eigen::Vector3f pInf = referenceFrame->K_otherToThis_R * KinvP;
     Eigen::Vector3f pReal = pInf / prior_idepth + referenceFrame->K_otherToThis_t;
 
@@ -1631,8 +1632,7 @@ inline float DepthMap::doLineStereo(
         return -1;
     }
 
-    if(!(rescaleFactor > 0.7f && rescaleFactor < 1.4f))
-    {
+    if(!(rescaleFactor > 0.7f && rescaleFactor < 1.4f)) {
         if(enablePrintDebugInfo) stats->num_stereo_rescale_oob++;
         return -1;
     }
@@ -1640,15 +1640,15 @@ inline float DepthMap::doLineStereo(
     // calculate values to search for
     Eigen::VectorXf key_intensities(5);
     key_intensities[0] = getInterpolatedElement(activeKeyFrameImageData,
-                 u - 2*epxn*rescaleFactor, v - 2*epyn*rescaleFactor, width);
+                keyframe_coordinate - 2 * epn * rescaleFactor, width);
     key_intensities[1] = getInterpolatedElement(activeKeyFrameImageData,
-                 u - epxn*rescaleFactor, v - epyn*rescaleFactor, width);
+                keyframe_coordinate - 1 * epn * rescaleFactor, width);
     key_intensities[2] = getInterpolatedElement(activeKeyFrameImageData,
-                 u, v, width);
+                keyframe_coordinate, width);
     key_intensities[3] = getInterpolatedElement(activeKeyFrameImageData,
-                 u + epxn*rescaleFactor, v + epyn*rescaleFactor, width);
+                keyframe_coordinate + 1 * epn * rescaleFactor, width);
     key_intensities[4] = getInterpolatedElement(activeKeyFrameImageData,
-                 u + 2*epxn*rescaleFactor, v + 2*epyn*rescaleFactor, width);
+                keyframe_coordinate + 2 * epn * rescaleFactor, width);
 
 //	if(referenceFrame->K_otherToThis_t[2] * max_idepth + pInf[2] < 0.01)
 
@@ -1791,14 +1791,16 @@ inline float DepthMap::doLineStereo(
     float cpy = pFar[1];
 
     Eigen::VectorXf ref_intensities(5);
+    Eigen::VectorXf inc(2);
+    inc << incx, incy;
     ref_intensities[0] = getInterpolatedElement(referenceFrameImage,
-                                        cpx-2*incx, cpy-2*incy, width);
+                                        pFar.head(2) - 2 * inc, width);
     ref_intensities[1] = getInterpolatedElement(referenceFrameImage,
-                                        cpx-incx, cpy-incy, width);
+                                        pFar.head(2) - 1 * inc, width);
     ref_intensities[2] = getInterpolatedElement(referenceFrameImage,
-                                        cpx, cpy, width);
+                                        pFar.head(2) - 0 * inc, width);
     ref_intensities[3] = getInterpolatedElement(referenceFrameImage,
-                                        cpx+incx, cpy+incy, width);
+                                        pFar.head(2) + 1 * inc, width);
 
 
     /*
@@ -1847,8 +1849,8 @@ inline float DepthMap::doLineStereo(
         }
 
         // interpolate one new point
-        ref_intensities[4] = getInterpolatedElement(referenceFrameImage,
-                                            cpx+2*incx, cpy+2*incy, width);
+        const auto p_((Eigen::Vector2f() << cpx+2*incx, cpy+2*incy).finished());
+        ref_intensities[4] = getInterpolatedElement(referenceFrameImage, p_, width);
 
         // hacky but fast way to get error and differential error:
         // switch buffer variables for last loop.

@@ -41,23 +41,27 @@ void printMessageOnCVImage(cv::Mat &image, std::string line1,
 
 // reads interpolated element from a uchar* array
 // SSE2 optimization possible
-inline float getInterpolatedElement(const float* const mat, const float x,
-                                    const float y, const int width)
+inline float getInterpolatedElement(const float* const mat,
+                                    const Eigen::Vector2f &p,
+                                    const int width)
 {
     //stats.num_pixelInterpolations++;
 
-    int ix = (int)x;
-    int iy = (int)y;
-    float dx = x - ix;
-    float dy = y - iy;
+    const Eigen::Vector2i ip = p.cast<int>();
+    const Eigen::Vector2f dp = p - ip.cast<float>();
+
+    int ix = ip[0];
+    int iy = ip[1];
+    float dx = dp[0];
+    float dy = dp[1];
     float dxdy = dx*dy;
-    const float* bp = mat +ix+iy*width;
 
+    const float* bp = mat + ix + iy*width;
 
-    float res =   dxdy * bp[1+width]
-                  + (dy-dxdy) * bp[width]
-                  + (dx-dxdy) * bp[1]
-                  + (1-dx-dy+dxdy) * bp[0];
+    float res = dxdy * bp[1+width]
+              + (dy-dxdy) * bp[width]
+              + (dx-dxdy) * bp[1]
+              + (1-dx-dy+dxdy) * bp[0];
 
     return res;
 }
