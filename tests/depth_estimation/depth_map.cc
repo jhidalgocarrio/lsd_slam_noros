@@ -3,7 +3,7 @@
 #include <Eigen/Dense>
 #include <catch.h>
 
-#include "depth_estimation/test_depth_map.h"
+#include "depth_estimation/depth_map.h"
 
 using namespace lsd_slam;
 

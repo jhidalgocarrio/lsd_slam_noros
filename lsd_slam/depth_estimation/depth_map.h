@@ -150,13 +150,15 @@ private:
 
     void observeDepth();
     void observeDepthRow(int yMin, int yMax, RunningStats* stats);
-    bool observeDepthCreate(const int &x, const int &y, const int &idx,
+    bool observeDepthCreate(const Eigen::Vector2i &keyframe_coordinate, const int &idx,
                             RunningStats* const &stats);
-    bool observeDepthUpdate(const int &x, const int &y, const int &idx,
+    bool observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate, const int &idx,
                             const float* keyFrameMaxGradBuf, RunningStats* const &stats);
-    bool makeAndCheckEPL(const int x, const int y, const Frame* const ref,
-                         float* pepx, float* pepy, RunningStats* const stats);
 
+    bool makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
+                         const Frame* const ref,
+                         Eigen::Vector2f &pep,
+                         RunningStats* const stats);
 
     void regularizeDepthMap(bool removeOcclusion, int validityTH);
     template<bool removeOcclusions> void regularizeDepthMapRow(int validityTH,

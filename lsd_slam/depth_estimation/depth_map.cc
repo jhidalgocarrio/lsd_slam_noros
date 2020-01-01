@@ -24,7 +24,7 @@
 #include <stdio.h>
 #include <fstream>
 #include <iostream>
-
+#include <cmath>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <Eigen/Dense>
 
@@ -34,11 +34,10 @@
 #include "util/global_funcs.h"
 #include "io_wrapper/image_display.h"
 #include "global_mapping/key_frame_graph.h"
+#include "projection.h"
 
 
-namespace lsd_slam
-{
-
+namespace lsd_slam {
 float calc_grad_along_line(Eigen::VectorXf &intensities, float interval) {
     float grad_along_line = 0;
     for (int i = 0; i < intensities.size() - 1; i++) {
@@ -120,36 +119,36 @@ void DepthMap::reset()
 }
 
 
-void DepthMap::observeDepthRow(int yMin, int yMax, RunningStats* stats)
-{
+void DepthMap::observeDepthRow(int yMin, int yMax, RunningStats* stats) {
     const float* keyFrameMaxGradBuf = activeKeyFrame->maxGradients(0);
 
     int successes = 0;
 
     for(int y=yMin; y<yMax; y++)
-        for(int x=3; x<width-3; x++)
-        {
+        for(int x=3; x<width-3; x++) {
             int idx = x+y*width;
             DepthMapPixelHypothesis* target = currentDepthMap+idx;
             bool hasHypothesis = target->isValid;
 
             // ======== 1. check absolute grad =========
-            if(hasHypothesis && keyFrameMaxGradBuf[idx] < MIN_ABS_GRAD_DECREASE)
-            {
+            if(hasHypothesis &&
+               keyFrameMaxGradBuf[idx] < MIN_ABS_GRAD_DECREASE) {
                 target->isValid = false;
                 continue;
             }
 
-            if(keyFrameMaxGradBuf[idx] < MIN_ABS_GRAD_CREATE
-                    || target->blacklisted < MIN_BLACKLIST)
+            if(keyFrameMaxGradBuf[idx] < MIN_ABS_GRAD_CREATE ||
+               target->blacklisted < MIN_BLACKLIST)
                 continue;
 
+            const Eigen::Vector2i keyframe_coordinate(x, y);
 
             bool success;
             if(!hasHypothesis)
-                success = observeDepthCreate(x, y, idx, stats);
+                success = observeDepthCreate(keyframe_coordinate, idx, stats);
             else
-                success = observeDepthUpdate(x, y, idx, keyFrameMaxGradBuf, stats);
+                success = observeDepthUpdate(keyframe_coordinate, idx,
+                                             keyFrameMaxGradBuf, stats);
 
             if(success)
                 successes++;
@@ -192,51 +191,55 @@ void DepthMap::observeDepth()
 }
 
 
+bool DepthMap::makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
+                               const Frame* const ref,
+                               Eigen::Vector2f &pep,
+                               RunningStats* const stats) {
+    const int x = keyframe_coordinate[0];
+    const int y = keyframe_coordinate[1];
 
-
-
-bool DepthMap::makeAndCheckEPL(const int x, const int y,
-                               const Frame* const ref, float* pepx, float* pepy, RunningStats* const stats)
-{
     int idx = x+y*width;
 
     // ======= make epl ========
     // calculate the plane spanned by the two camera centers and the point (x,y,1)
     // intersect it with the keyframe's image plane (at depth=1)
-    float epx = - fx * ref->thisToOther_t[0] + ref->thisToOther_t[2]*(x - cx);
-    float epy = - fy * ref->thisToOther_t[1] + ref->thisToOther_t[2]*(y - cy);
+    const Eigen::Matrix3f &K = create_intrinsic_matrix(fx, fy, cx, cy);
+
+    const Eigen::Vector2f ep = ref->thisToOther_t[2] * (
+        keyframe_coordinate.cast<float>() - projection(ref->thisToOther_t, K)
+    );
+
+    float epx = -fx * ref->thisToOther_t[0] + ref->thisToOther_t[2]*(x - cx);
+    float epy = -fy * ref->thisToOther_t[1] + ref->thisToOther_t[2]*(y - cy);
 
     if(std::isnan(epx+epy))
         return false;
 
-
     // ======== check epl length =========
-    float eplLengthSquared = epx*epx+epy*epy;
-    if(eplLengthSquared < MIN_EPL_LENGTH_SQUARED)
-    {
+    const float eplLengthSquared = ep.squaredNorm();
+
+    if(eplLengthSquared < MIN_EPL_LENGTH_SQUARED) {
         if(enablePrintDebugInfo) stats->num_observe_skipped_small_epl++;
         return false;
     }
 
-
     // ===== check epl-grad magnitude ======
-    float gx = activeKeyFrameImageData[idx+1] - activeKeyFrameImageData[idx-1];
-    float gy = activeKeyFrameImageData[idx+width] - activeKeyFrameImageData[idx
-               -width];
-    float eplGradSquared = gx * epx + gy * epy;
-    eplGradSquared = eplGradSquared*eplGradSquared /
-                     eplLengthSquared;	// square and norm with epl-length
+    const float gx = activeKeyFrameImageData[idx+1]
+                   - activeKeyFrameImageData[idx-1];
+    const float gy = activeKeyFrameImageData[idx+width]
+                   - activeKeyFrameImageData[idx-width];
+    const Eigen::Vector2f grad(gx, gy);
+    float eplGradSquared = grad.dot(ep);
+    // square and norm with epl-length
+    eplGradSquared = eplGradSquared*eplGradSquared / eplLengthSquared;
 
-    if(eplGradSquared < MIN_EPL_GRAD_SQUARED)
-    {
+    if(eplGradSquared < MIN_EPL_GRAD_SQUARED) {
         if(enablePrintDebugInfo) stats->num_observe_skipped_small_epl_grad++;
         return false;
     }
 
-
     // ===== check epl-grad angle ======
-    if(eplGradSquared / (gx*gx+gy*gy) < MIN_EPL_ANGLE_SQUARED)
-    {
+    if(eplGradSquared / grad.squaredNorm() < MIN_EPL_ANGLE_SQUARED) {
         if(enablePrintDebugInfo) stats->num_observe_skipped_small_epl_angle++;
         return false;
     }
@@ -244,14 +247,14 @@ bool DepthMap::makeAndCheckEPL(const int x, const int y,
 
     // ===== DONE - return "normalized" epl =====
     float fac = GRADIENT_SAMPLE_DIST / sqrt(eplLengthSquared);
-    *pepx = epx * fac;
-    *pepy = epy * fac;
+    pep = ep * fac;
 
     return true;
 }
 
 
-bool DepthMap::observeDepthCreate(const int &x, const int &y, const int &idx,
+bool DepthMap::observeDepthCreate(const Eigen::Vector2i &keyframe_coordinate,
+                                  const int &idx,
                                   RunningStats* const &stats)
 {
     DepthMapPixelHypothesis* target = currentDepthMap+idx;
@@ -259,12 +262,15 @@ bool DepthMap::observeDepthCreate(const int &x, const int &y, const int &idx,
     Frame* refFrame = activeKeyFrameIsReactivated ? newest_referenceFrame :
                       oldest_referenceFrame;
 
+    const int x = keyframe_coordinate[0];
+    const int y = keyframe_coordinate[1];
     if(refFrame->getTrackingParent() == activeKeyFrame)
     {
         bool* wasGoodDuringTracking = refFrame->refPixelWasGoodNoCreate();
-        if(wasGoodDuringTracking != 0
-                && !wasGoodDuringTracking[(x >> SE3TRACKING_MIN_LEVEL) +
-                                                                       (width >> SE3TRACKING_MIN_LEVEL)*(y >> SE3TRACKING_MIN_LEVEL)])
+        if(wasGoodDuringTracking != 0 &&
+           !wasGoodDuringTracking[(x >> SE3TRACKING_MIN_LEVEL) +
+                                  (width >> SE3TRACKING_MIN_LEVEL) *
+                                  (y >> SE3TRACKING_MIN_LEVEL)])
         {
             if(plotStereoImages)
                 debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(255,0,
@@ -273,8 +279,8 @@ bool DepthMap::observeDepthCreate(const int &x, const int &y, const int &idx,
         }
     }
 
-    float epx, epy;
-    bool isGood = makeAndCheckEPL(x, y, refFrame, &epx, &epy, stats);
+    Eigen::Vector2f ep;
+    bool isGood = makeAndCheckEPL(keyframe_coordinate, refFrame, ep, stats);
     if(!isGood) return false;
 
     if(enablePrintDebugInfo) stats->num_observe_create_attempted++;
@@ -283,7 +289,7 @@ bool DepthMap::observeDepthCreate(const int &x, const int &y, const int &idx,
     float new_v = y;
     float result_idepth, result_var, result_eplLength;
     float error = doLineStereo(
-                      new_u,new_v,epx,epy,
+                      new_u, new_v, ep[0], ep[1],
                       0.0f, 1.0f, 1.0f/MIN_DEPTH,
                       refFrame, refFrame->image(0),
                       result_idepth, result_var, result_eplLength, stats);
@@ -314,21 +320,24 @@ bool DepthMap::observeDepthCreate(const int &x, const int &y, const int &idx,
     return true;
 }
 
-bool DepthMap::observeDepthUpdate(const int &x, const int &y, const int &idx,
-                                  const float* keyFrameMaxGradBuf, RunningStats* const &stats)
+bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate,
+                                  const int &idx,
+                                  const float* keyFrameMaxGradBuf,
+                                  RunningStats* const &stats)
 {
     DepthMapPixelHypothesis* target = currentDepthMap+idx;
     Frame* refFrame;
 
-
+    const int x = keyframe_coordinate[0];
+    const int y = keyframe_coordinate[1];
     if(!activeKeyFrameIsReactivated)
     {
         if((int)target->nextStereoFrameMinID - referenceFrameByID_offset >=
                 (int)referenceFrameByID.size())
         {
             if(plotStereoImages)
-                debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(0,255,
-                        0);	// GREEN FOR skip
+                // GREEN FOR skip
+                debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(0,255, 0);
 
             if(enablePrintDebugInfo) stats->num_observe_skip_alreadyGood++;
             return false;
@@ -338,7 +347,7 @@ bool DepthMap::observeDepthUpdate(const int &x, const int &y, const int &idx,
             refFrame = oldest_referenceFrame;
         else
             refFrame = referenceFrameByID[(int)target->nextStereoFrameMinID -
-                                                                            referenceFrameByID_offset];
+                                          referenceFrameByID_offset];
     }
     else
         refFrame = newest_referenceFrame;
@@ -347,19 +356,20 @@ bool DepthMap::observeDepthUpdate(const int &x, const int &y, const int &idx,
     if(refFrame->getTrackingParent() == activeKeyFrame)
     {
         bool* wasGoodDuringTracking = refFrame->refPixelWasGoodNoCreate();
-        if(wasGoodDuringTracking != 0
-                && !wasGoodDuringTracking[(x >> SE3TRACKING_MIN_LEVEL) +
-                                                                       (width >> SE3TRACKING_MIN_LEVEL)*(y >> SE3TRACKING_MIN_LEVEL)])
+        if(wasGoodDuringTracking != 0 &&
+           !wasGoodDuringTracking[(x >> SE3TRACKING_MIN_LEVEL) +
+                                  (width >> SE3TRACKING_MIN_LEVEL) *
+                                  (y >> SE3TRACKING_MIN_LEVEL)])
         {
             if(plotStereoImages)
-                debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(255,0,
-                        0); // BLUE for SKIPPED NOT GOOD TRACKED
+                // BLUE for SKIPPED NOT GOOD TRACKED
+                debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(255, 0, 0);
             return false;
         }
     }
 
-    float epx, epy;
-    bool isGood = makeAndCheckEPL(x, y, refFrame, &epx, &epy, stats);
+    Eigen::Vector2f ep;
+    bool isGood = makeAndCheckEPL(keyframe_coordinate, refFrame, ep, stats);
     if(!isGood) return false;
 
     // which exact point to track, and where from.
@@ -374,7 +384,7 @@ bool DepthMap::observeDepthUpdate(const int &x, const int &y, const int &idx,
     float result_idepth, result_var, result_eplLength;
 
     float error = doLineStereo(
-                      x,y,epx,epy,
+                      x, y, ep[0], ep[1],
                       min_idepth, target->idepth_smoothed,max_idepth,
                       refFrame, refFrame->image(0),
                       result_idepth, result_var, result_eplLength, stats);

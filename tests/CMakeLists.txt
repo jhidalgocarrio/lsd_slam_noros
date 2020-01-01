@@ -1,6 +1,7 @@
 add_executable(
     lsdslam_tests
     depth_estimation/depth_map.cc
+    projection.cc
     main.cc
 )
 
