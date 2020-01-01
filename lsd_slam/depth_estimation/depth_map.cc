@@ -209,12 +209,6 @@ bool DepthMap::makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
         keyframe_coordinate.cast<float>() - projection(ref->thisToOther_t, K)
     );
 
-    float epx = -fx * ref->thisToOther_t[0] + ref->thisToOther_t[2]*(x - cx);
-    float epy = -fy * ref->thisToOther_t[1] + ref->thisToOther_t[2]*(y - cy);
-
-    if(std::isnan(epx+epy))
-        return false;
-
     // ======== check epl length =========
     const float eplLengthSquared = ep.squaredNorm();
 
@@ -285,11 +279,10 @@ bool DepthMap::observeDepthCreate(const Eigen::Vector2i &keyframe_coordinate,
 
     if(enablePrintDebugInfo) stats->num_observe_create_attempted++;
 
-    float new_u = x;
-    float new_v = y;
     float result_idepth, result_var, result_eplLength;
+    const Eigen::Vector2f p(x, y);
     float error = doLineStereo(
-                      new_u, new_v, ep[0], ep[1],
+                      p, ep,
                       0.0f, 1.0f, 1.0f/MIN_DEPTH,
                       refFrame, refFrame->image(0),
                       result_idepth, result_var, result_eplLength, stats);
@@ -383,8 +376,9 @@ bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate,
 
     float result_idepth, result_var, result_eplLength;
 
+    const Eigen::Vector2f p(x, y);
     float error = doLineStereo(
-                      x, y, ep[0], ep[1],
+                      p, ep,
                       min_idepth, target->idepth_smoothed,max_idepth,
                       refFrame, refFrame->image(0),
                       result_idepth, result_var, result_eplLength, stats);
@@ -1603,12 +1597,17 @@ int DepthMap::debugPlotDepthMap()
 // returns: idepth_var: (approximated) measurement variance of inverse depth of result_point_NEW
 // returns error if sucessful; -1 if out of bounds, -2 if not found.
 inline float DepthMap::doLineStereo(
-    const float u, const float v, const float epxn, const float epyn,
+    const Eigen::Vector2f &keyframe_coordinate, const Eigen::Vector2f &epn,
     const float min_idepth, const float prior_idepth, float max_idepth,
     const Frame* const referenceFrame, const float* referenceFrameImage,
     float &result_idepth, float &result_var, float &result_eplLength,
     RunningStats* stats)
 {
+    const float u = keyframe_coordinate[0];
+    const float v = keyframe_coordinate[1];
+    const float epxn = epn[0];
+    const float epyn = epn[1];
+
     if(enablePrintDebugInfo) stats->num_stereo_calls++;
 
     // calculate epipolar line start and end point in old image
