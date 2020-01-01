@@ -1584,6 +1584,11 @@ int DepthMap::debugPlotDepthMap()
     return 1;
 }
 
+bool is_in_image_range(const Eigen::Vector2f &keypoint,
+                       const Eigen::Vector2i image_size) {
+    return (0 < keypoint[0] && keypoint[0] < image_size[0] - 2 &&
+            0 < keypoint[1] && keypoint[1] < image_size[1] - 2);
+}
 
 
 
@@ -1617,15 +1622,12 @@ inline float DepthMap::doLineStereo(
 
     float rescaleFactor = pReal[2] * prior_idepth;
 
-    float firstX = u - 2*epxn*rescaleFactor;
-    float firstY = v - 2*epyn*rescaleFactor;
-    float lastX = u + 2*epxn*rescaleFactor;
-    float lastY = v + 2*epyn*rescaleFactor;
+    const Eigen::Vector2f first = keyframe_coordinate - 2*epn*rescaleFactor;
+    const Eigen::Vector2f last = keyframe_coordinate + 2*epn*rescaleFactor;
+    const Eigen::Vector2i image_size(width, height);
     // width - 2 and height - 2 comes from the one-sided gradient calculation at the bottom
-    if (firstX <= 0 || firstX >= width - 2
-     || firstY <= 0 || firstY >= height - 2
-     || lastX <= 0 || lastX >= width - 2
-     || lastY <= 0 || lastY >= height - 2) {
+    if (not (is_in_image_range(first, image_size) &&
+             is_in_image_range(last, image_size))) {
         return -1;
     }
 
