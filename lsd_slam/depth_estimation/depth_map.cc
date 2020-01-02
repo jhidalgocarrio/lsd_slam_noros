@@ -1681,35 +1681,26 @@ inline float DepthMap::doLineStereo(
     // calculate increments in which we will step through the epipolar line.
     // they are sampleDist (or half sample dist) long
     Eigen::Vector2f inc = pClose - pFar;
-    float eplLength = sqrt(inc[0]*inc[0]+inc[1]*inc[1]);
+    float eplLength = inc.norm();
     if(!eplLength > 0 || std::isinf(eplLength)) return -4;
 
-    if(eplLength > MAX_EPL_LENGTH_CROP)
-    {
-        pClose[0] = pFar[0] + inc[0] * MAX_EPL_LENGTH_CROP / eplLength;
-        pClose[1] = pFar[1] + inc[1] * MAX_EPL_LENGTH_CROP / eplLength;
+    if(eplLength > MAX_EPL_LENGTH_CROP) {
+        pClose = pFar + inc * MAX_EPL_LENGTH_CROP / eplLength;
     }
 
-    inc[0] *= GRADIENT_SAMPLE_DIST/eplLength;
-    inc[1] *= GRADIENT_SAMPLE_DIST/eplLength;
-
+    inc *= GRADIENT_SAMPLE_DIST/eplLength;
 
     // extend one sample_dist to left & right.
-    pFar[0] -= inc[0];
-    pFar[1] -= inc[1];
-    pClose[0] += inc[0];
-    pClose[1] += inc[1];
+    pFar -= inc;
+    pClose += inc;
 
 
     // make epl long enough (pad a little bit).
     if(eplLength < MIN_EPL_LENGTH_CROP)
     {
         float pad = (MIN_EPL_LENGTH_CROP - (eplLength)) / 2;
-        pFar[0] -= inc[0]*pad;
-        pFar[1] -= inc[1]*pad;
-
-        pClose[0] += inc[0]*pad;
-        pClose[1] += inc[1]*pad;
+        pFar -= inc*pad;
+        pClose += inc*pad;
     }
 
     // if inf point is outside of image: skip pixel.
@@ -1731,33 +1722,27 @@ inline float DepthMap::doLineStereo(
         if(pClose[0] <= SAMPLE_POINT_TO_BORDER)
         {
             float toAdd = (SAMPLE_POINT_TO_BORDER - pClose[0]) / inc[0];
-            pClose[0] += toAdd * inc[0];
-            pClose[1] += toAdd * inc[1];
+            pClose += toAdd * inc;
         }
         else if(pClose[0] >= width-SAMPLE_POINT_TO_BORDER)
         {
             float toAdd = (width-SAMPLE_POINT_TO_BORDER - pClose[0]) / inc[0];
-            pClose[0] += toAdd * inc[0];
-            pClose[1] += toAdd * inc[1];
+            pClose += toAdd * inc;
         }
 
         if(pClose[1] <= SAMPLE_POINT_TO_BORDER)
         {
             float toAdd = (SAMPLE_POINT_TO_BORDER - pClose[1]) / inc[1];
-            pClose[0] += toAdd * inc[0];
-            pClose[1] += toAdd * inc[1];
+            pClose += toAdd * inc;
         }
         else if(pClose[1] >= height-SAMPLE_POINT_TO_BORDER)
         {
             float toAdd = (height-SAMPLE_POINT_TO_BORDER - pClose[1]) / inc[1];
-            pClose[0] += toAdd * inc[0];
-            pClose[1] += toAdd * inc[1];
+            pClose += toAdd * inc;
         }
 
         // get new epl length
-        float fincx = pClose[0] - pFar[0];
-        float fincy = pClose[1] - pFar[1];
-        float newEplLength = sqrt(fincx*fincx+fincy*fincy);
+        float newEplLength = (pClose - pFar).norm();
 
         // test again
         if(pClose[0] <= SAMPLE_POINT_TO_BORDER ||
@@ -1772,16 +1757,14 @@ inline float DepthMap::doLineStereo(
 
     }
 
-
     // from here on:
     // - pInf: search start-point
     // - p0: search end-point
-    // - inc[0], inc[1]: search steps in pixel
-    // - eplLength, min_idepth, max_idepth: determines search-resolution, i.e. the result's variance.
+    // - inc: search step in pixel
+    // - eplLength, min_idepth, max_idepth:
+    // determines search-resolution, i.e. the result's variance.
 
-
-    float cpx = pFar[0];
-    float cpy = pFar[1];
+    Eigen::Vector2f cp = pFar;
 
     Eigen::VectorXf ref_intensities(5);
     ref_intensities[0] = getInterpolatedElement(referenceFrameImage,
@@ -1834,13 +1817,13 @@ inline float DepthMap::doLineStereo(
     int argmin=-1, second_argmin =-1;
 
     for (int i = 0; ; i++) {
-        if((inc[0] < 0) != (cpx > pClose[0]) ||
-           (inc[1] < 0) != (cpy > pClose[1])) {
+        if((inc[0] < 0) != (cp[0] > pClose[0]) ||
+           (inc[1] < 0) != (cp[1] > pClose[1])) {
             break;
         }
 
         // interpolate one new point
-        const auto p_((Eigen::Vector2f() << cpx+2*inc[0], cpy+2*inc[1]).finished());
+        const auto p_((Eigen::Vector2f() << cp[0]+2*inc[0], cp[1]+2*inc[1]).finished());
         ref_intensities[4] = getInterpolatedElement(referenceFrameImage, p_, width);
 
         // hacky but fast way to get error and differential error:
@@ -1869,8 +1852,8 @@ inline float DepthMap::doLineStereo(
             next_error = -1;
             next_diff = -1;
 
-            argmin_x = cpx;
-            argmin_y = cpy;
+            argmin_x = cp[0];
+            argmin_y = cp[1];
         } else {
         // otherwise: the last might be the current winner,
         // in which case i have to save these values.
@@ -1896,8 +1879,7 @@ inline float DepthMap::doLineStereo(
 
         if(enablePrintDebugInfo) stats->num_stereo_comparisons++;
 
-        cpx += inc[0];
-        cpy += inc[1];
+        cp += inc;
     }
 
     // if error too big, will return -3, otherwise -2.
