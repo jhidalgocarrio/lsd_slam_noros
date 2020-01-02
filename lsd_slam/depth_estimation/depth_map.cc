@@ -1865,10 +1865,7 @@ inline float DepthMap::doLineStereo(
 
         // shift everything one further.
         prev_error_ = error;
-        ref_intensities[0] = ref_intensities[1];
-        ref_intensities[1] = ref_intensities[2];
-        ref_intensities[2] = ref_intensities[3];
-        ref_intensities[3] = ref_intensities[4];
+        ref_intensities.head(4) = ref_intensities.tail(4);
 
         if(enablePrintDebugInfo) stats->num_stereo_comparisons++;
 
