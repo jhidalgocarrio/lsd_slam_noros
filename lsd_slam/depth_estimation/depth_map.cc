@@ -1808,7 +1808,7 @@ inline float DepthMap::doLineStereo(
     // alternating intermediate vars
     Eigen::VectorXf eA(5), eB(5);
 
-    int argmin=-1, second_argmin =-1;
+    int curr_argmin=-1, second_argmin =-1;
 
     for (int i = 0; ; i++) {
         if((inc[0] < 0) != (cp[0] > pClose[0]) ||
@@ -1835,11 +1835,11 @@ inline float DepthMap::doLineStereo(
         if(error < curr_error) {
             // put to second-best
             second_min_error = curr_error;
-            second_argmin = argmin;
+            second_argmin = curr_argmin;
 
             // set best.
             curr_error = error;
-            argmin = i;
+            curr_argmin = i;
 
             prev_error = prev_error_;
             prev_diff = eA.dot(eB);
@@ -1850,7 +1850,7 @@ inline float DepthMap::doLineStereo(
         } else {
         // otherwise: the last might be the current winner,
         // in which case i have to save these values.
-            if(i - 1 == argmin) {
+            if(i - 1 == curr_argmin) {
                 next_error = error;
                 next_diff = eA.dot(eB);
             }
@@ -1884,7 +1884,7 @@ inline float DepthMap::doLineStereo(
 
 
     // check if clear enough winner
-    if(abs(argmin - second_argmin) > 1 &&
+    if(abs(curr_argmin - second_argmin) > 1 &&
        MIN_DISTANCE_ERROR_STEREO * curr_error > second_min_error)
     {
         if(enablePrintDebugInfo) stats->num_stereo_invalid_unclear_winner++;
