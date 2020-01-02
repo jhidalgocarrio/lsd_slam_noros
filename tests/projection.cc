@@ -19,11 +19,30 @@ TEST_CASE("intrinsic matrix can be created", "[projection]") {
 
 TEST_CASE("perspective projection", "[projection]") {
     Eigen::Vector3f p(10, 20, 5);
-    Eigen::Matrix3f K;
-    K << 1, 0, 0,
-         0, 1, 0,
-         0, 0, 1;
-    Eigen::Vector2f q = projection(p, K);
+    SECTION("intrinsic is identity") {
+        Eigen::Matrix3f K;
+        K << 1, 0, 0,
+             0, 1, 0,
+             0, 0, 1;
+        Eigen::Vector2f q = perspective_projection(p, K);
+        REQUIRE(q(0) == 2);
+        REQUIRE(q(1) == 4);
+    }
+
+    SECTION("intrinsic is not identity") {
+        Eigen::Matrix3f K;
+        K << 3, 0, 4,
+             0, 4, 2,
+             0, 0, 1;
+        Eigen::Vector2f q = perspective_projection(p, K);
+        REQUIRE(q(0) == 10);
+        REQUIRE(q(1) == 18);
+    }
+}
+
+TEST_CASE("division by z ", "[projection]") {
+    Eigen::Vector3f p(10, 20, 5);
+    Eigen::Vector2f q = projection(p);
     REQUIRE(q(0) == 2);
     REQUIRE(q(1) == 4);
 }

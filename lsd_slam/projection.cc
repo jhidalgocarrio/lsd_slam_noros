@@ -5,9 +5,13 @@ namespace lsd_slam {
 
 float const EPSILON = 1e-16;
 
-Eigen::Vector2f projection(const Eigen::Vector3f p, const Eigen::Matrix3f &K) {
-    Eigen::Vector3f q = K * p;
-    return q.head(2) / (q(2) + EPSILON);
+Eigen::Vector2f projection(const Eigen::Vector3f &p) {
+    return p.head(2) / (p(2) + EPSILON);
+}
+
+Eigen::Vector2f perspective_projection(const Eigen::Vector3f &p,
+                                       const Eigen::Matrix3f &K) {
+    return projection(K * p);
 }
 
 Eigen::Matrix3f create_intrinsic_matrix(float fx, float fy, float cx, float cy) {

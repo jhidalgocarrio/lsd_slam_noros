@@ -206,7 +206,7 @@ bool DepthMap::makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
     const Eigen::Matrix3f &K = create_intrinsic_matrix(fx, fy, cx, cy);
 
     const Eigen::Vector2f ep = ref->thisToOther_t[2] * (
-        keyframe_coordinate.cast<float>() - projection(ref->thisToOther_t, K)
+        keyframe_coordinate.cast<float>() - perspective_projection(ref->thisToOther_t, K)
     );
 
     // ======== check epl length =========
@@ -1652,25 +1652,26 @@ inline float DepthMap::doLineStereo(
 
 //	if(referenceFrame->K_otherToThis_t[2] * max_idepth + pInf[2] < 0.01)
 
-    Eigen::Vector3f pClose = pInf + referenceFrame->K_otherToThis_t*max_idepth;
+    Eigen::Vector3f _pClose = pInf + referenceFrame->K_otherToThis_t*max_idepth;
     // if the assumed close-point lies behind the
     // image, have to change that.
-    if(pClose[2] < 0.001) {
+    if(_pClose[2] < 0.001) {
         max_idepth = (0.001-pInf[2]) / referenceFrame->K_otherToThis_t[2];
-        pClose = pInf + referenceFrame->K_otherToThis_t*max_idepth;
+        _pClose = pInf + referenceFrame->K_otherToThis_t*max_idepth;
     }
     // pos in new image of point (xy), assuming max_idepth
-    pClose = pClose / pClose[2];
+    Eigen::Vector2f pClose = projection(_pClose);
 
-    Eigen::Vector3f pFar = pInf + referenceFrame->K_otherToThis_t*min_idepth;
+    Eigen::Vector3f _pFar = pInf + referenceFrame->K_otherToThis_t*min_idepth;
     // if the assumed far-point lies behind the image or closter than the near-point,
     // we moved past the Point it and should stop.
-    if(pFar[2] < 0.001 || max_idepth < min_idepth)
+    if(_pFar[2] < 0.001 || max_idepth < min_idepth)
     {
         if(enablePrintDebugInfo) stats->num_stereo_inf_oob++;
         return -1;
     }
-    pFar = pFar / pFar[2]; // pos in new image of point (xy), assuming min_idepth
+    // pos in new image of point (xy), assuming min_idepth
+    Eigen::Vector2f pFar = _pFar.head(2) / _pFar[2];
 
 
     // check for nan due to eg division by zero.
@@ -1713,12 +1714,10 @@ inline float DepthMap::doLineStereo(
     }
 
     // if inf point is outside of image: skip pixel.
-    if(
-        pFar[0] <= SAMPLE_POINT_TO_BORDER ||
-        pFar[0] >= width-SAMPLE_POINT_TO_BORDER ||
-        pFar[1] <= SAMPLE_POINT_TO_BORDER ||
-        pFar[1] >= height-SAMPLE_POINT_TO_BORDER)
-    {
+    if(pFar[0] <= SAMPLE_POINT_TO_BORDER ||
+       pFar[0] >= width-SAMPLE_POINT_TO_BORDER ||
+       pFar[1] <= SAMPLE_POINT_TO_BORDER ||
+       pFar[1] >= height-SAMPLE_POINT_TO_BORDER) {
         if(enablePrintDebugInfo) stats->num_stereo_inf_oob++;
         return -1;
     }
@@ -1726,12 +1725,10 @@ inline float DepthMap::doLineStereo(
 
 
     // if near point is outside: move inside, and test length again.
-    if(
-        pClose[0] <= SAMPLE_POINT_TO_BORDER ||
-        pClose[0] >= width-SAMPLE_POINT_TO_BORDER ||
-        pClose[1] <= SAMPLE_POINT_TO_BORDER ||
-        pClose[1] >= height-SAMPLE_POINT_TO_BORDER)
-    {
+    if(pClose[0] <= SAMPLE_POINT_TO_BORDER ||
+       pClose[0] >= width-SAMPLE_POINT_TO_BORDER ||
+       pClose[1] <= SAMPLE_POINT_TO_BORDER ||
+       pClose[1] >= height-SAMPLE_POINT_TO_BORDER) {
         if(pClose[0] <= SAMPLE_POINT_TO_BORDER)
         {
             float toAdd = (SAMPLE_POINT_TO_BORDER - pClose[0]) / incx;
@@ -1764,14 +1761,11 @@ inline float DepthMap::doLineStereo(
         float newEplLength = sqrt(fincx*fincx+fincy*fincy);
 
         // test again
-        if(
-            pClose[0] <= SAMPLE_POINT_TO_BORDER ||
-            pClose[0] >= width-SAMPLE_POINT_TO_BORDER ||
-            pClose[1] <= SAMPLE_POINT_TO_BORDER ||
-            pClose[1] >= height-SAMPLE_POINT_TO_BORDER ||
-            newEplLength < 8
-        )
-        {
+        if(pClose[0] <= SAMPLE_POINT_TO_BORDER ||
+           pClose[0] >= width-SAMPLE_POINT_TO_BORDER ||
+           pClose[1] <= SAMPLE_POINT_TO_BORDER ||
+           pClose[1] >= height-SAMPLE_POINT_TO_BORDER ||
+           newEplLength < 8) {
             if(enablePrintDebugInfo) stats->num_stereo_near_oob++;
             return -1;
         }
