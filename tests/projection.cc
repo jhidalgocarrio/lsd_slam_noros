@@ -4,6 +4,15 @@
 
 using namespace lsd_slam;
 
+TEST_CASE("compute homogeneous form", "[projection]") {
+    Eigen::Vector2f p(2, 4);
+    Eigen::Vector3f q = tohomogeneous(p);
+    assert(q(0) == 2);
+    assert(q(1) == 4);
+    assert(q(2) == 1);
+}
+
+
 TEST_CASE("intrinsic matrix can be created", "[projection]") {
     Eigen::Matrix3f K = create_intrinsic_matrix(10, 12, 3, 4);
     REQUIRE(K(0, 0) == 10);

@@ -22,4 +22,9 @@ Eigen::Matrix3f create_intrinsic_matrix(float fx, float fy, float cx, float cy) 
     return K;
 }
 
+Eigen::Vector3f tohomogeneous(const Eigen::Vector2f &p) {
+    const Eigen::Vector3f q(p[0], p[1], 1);
+    return q;
+}
+
 }
