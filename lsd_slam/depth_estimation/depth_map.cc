@@ -48,6 +48,7 @@ float calc_grad_along_line(Eigen::VectorXf &intensities, float interval) {
     return grad_along_line / (interval * interval);
 }
 
+
 DepthMap::DepthMap(int w, int h, const Eigen::Matrix3f& K)
 {
     width = w;
@@ -205,12 +206,12 @@ bool DepthMap::makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
     // intersect it with the keyframe's image plane (at depth=1)
     const Eigen::Matrix3f &K = create_intrinsic_matrix(fx, fy, cx, cy);
 
-    const Eigen::Vector2f ep = ref->thisToOther_t[2] * (
+    const Eigen::Vector2f epipolar_line = ref->thisToOther_t[2] * (
         keyframe_coordinate.cast<float>() - perspective_projection(ref->thisToOther_t, K)
     );
 
     // ======== check epl length =========
-    const float eplLengthSquared = ep.squaredNorm();
+    const float eplLengthSquared = epipolar_line.squaredNorm();
 
     if(eplLengthSquared < MIN_EPL_LENGTH_SQUARED) {
         if(enablePrintDebugInfo) stats->num_observe_skipped_small_epl++;
@@ -223,7 +224,7 @@ bool DepthMap::makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
     const float gy = activeKeyFrameImageData[idx+width]
                    - activeKeyFrameImageData[idx-width];
     const Eigen::Vector2f grad(gx, gy);
-    float eplGradSquared = grad.dot(ep);
+    float eplGradSquared = grad.dot(epipolar_line);
     // square and norm with epl-length
     eplGradSquared = eplGradSquared*eplGradSquared / eplLengthSquared;
 
@@ -241,7 +242,7 @@ bool DepthMap::makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
 
     // ===== DONE - return "normalized" epl =====
     float fac = GRADIENT_SAMPLE_DIST / sqrt(eplLengthSquared);
-    pep = ep * fac;
+    pep = epipolar_line * fac;
 
     return true;
 }
@@ -273,8 +274,8 @@ bool DepthMap::observeDepthCreate(const Eigen::Vector2i &keyframe_coordinate,
         }
     }
 
-    Eigen::Vector2f ep;
-    bool isGood = makeAndCheckEPL(keyframe_coordinate, refFrame, ep, stats);
+    Eigen::Vector2f epipolar_line;
+    bool isGood = makeAndCheckEPL(keyframe_coordinate, refFrame, epipolar_line, stats);
     if(!isGood) return false;
 
     if(enablePrintDebugInfo) stats->num_observe_create_attempted++;
@@ -282,7 +283,7 @@ bool DepthMap::observeDepthCreate(const Eigen::Vector2i &keyframe_coordinate,
     float result_idepth, result_var, result_eplLength;
     const Eigen::Vector2f p(x, y);
     float error = doLineStereo(
-                      p, ep,
+                      p, epipolar_line,
                       0.0f, 1.0f, 1.0f/MIN_DEPTH,
                       refFrame, refFrame->image(0),
                       result_idepth, result_var, result_eplLength, stats);
@@ -361,8 +362,8 @@ bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate,
         }
     }
 
-    Eigen::Vector2f ep;
-    bool isGood = makeAndCheckEPL(keyframe_coordinate, refFrame, ep, stats);
+    Eigen::Vector2f epipolar_line;
+    bool isGood = makeAndCheckEPL(keyframe_coordinate, refFrame, epipolar_line, stats);
     if(!isGood) return false;
 
     // which exact point to track, and where from.
@@ -378,7 +379,7 @@ bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate,
 
     const Eigen::Vector2f p(x, y);
     float error = doLineStereo(
-                      p, ep,
+                      p, epipolar_line,
                       min_idepth, target->idepth_smoothed,max_idepth,
                       refFrame, refFrame->image(0),
                       result_idepth, result_var, result_eplLength, stats);
@@ -1603,7 +1604,7 @@ bool is_in_image_range(const Eigen::Vector2f &keypoint,
 // returns: idepth_var: (approximated) measurement variance of inverse depth of result_point_NEW
 // returns error if sucessful; -1 if out of bounds, -2 if not found.
 inline float DepthMap::doLineStereo(
-    const Eigen::Vector2f &keyframe_coordinate, const Eigen::Vector2f &epn,
+    const Eigen::Vector2f &keyframe_coordinate, const Eigen::Vector2f &epipolar_direction,
     const float min_idepth, const float prior_idepth, float max_idepth,
     const Frame* const referenceFrame, const float* referenceFrameImage,
     float &result_idepth, float &result_var, float &result_eplLength,
@@ -1611,8 +1612,6 @@ inline float DepthMap::doLineStereo(
 {
     const float u = keyframe_coordinate[0];
     const float v = keyframe_coordinate[1];
-    const float epxn = epn[0];
-    const float epyn = epn[1];
 
     if(enablePrintDebugInfo) stats->num_stereo_calls++;
 
@@ -1623,8 +1622,8 @@ inline float DepthMap::doLineStereo(
 
     float rescaleFactor = pReal[2] * prior_idepth;
 
-    const Eigen::Vector2f first = keyframe_coordinate - 2*epn*rescaleFactor;
-    const Eigen::Vector2f last = keyframe_coordinate + 2*epn*rescaleFactor;
+    const Eigen::Vector2f first = keyframe_coordinate - 2*epipolar_direction*rescaleFactor;
+    const Eigen::Vector2f last = keyframe_coordinate + 2*epipolar_direction*rescaleFactor;
     const Eigen::Vector2i image_size(width, height);
     // width - 2 and height - 2 comes from the one-sided gradient calculation at the bottom
     if (not (is_in_image_range(first, image_size) &&
@@ -1640,15 +1639,15 @@ inline float DepthMap::doLineStereo(
     // calculate values to search for
     Eigen::VectorXf key_intensities(5);
     key_intensities[0] = getInterpolatedElement(activeKeyFrameImageData,
-                keyframe_coordinate - 2 * epn * rescaleFactor, width);
+                keyframe_coordinate - 2 * epipolar_direction * rescaleFactor, width);
     key_intensities[1] = getInterpolatedElement(activeKeyFrameImageData,
-                keyframe_coordinate - 1 * epn * rescaleFactor, width);
+                keyframe_coordinate - 1 * epipolar_direction * rescaleFactor, width);
     key_intensities[2] = getInterpolatedElement(activeKeyFrameImageData,
                 keyframe_coordinate, width);
     key_intensities[3] = getInterpolatedElement(activeKeyFrameImageData,
-                keyframe_coordinate + 1 * epn * rescaleFactor, width);
+                keyframe_coordinate + 1 * epipolar_direction * rescaleFactor, width);
     key_intensities[4] = getInterpolatedElement(activeKeyFrameImageData,
-                keyframe_coordinate + 2 * epn * rescaleFactor, width);
+                keyframe_coordinate + 2 * epipolar_direction * rescaleFactor, width);
 
 //	if(referenceFrame->K_otherToThis_t[2] * max_idepth + pInf[2] < 0.01)
 
@@ -1966,20 +1965,25 @@ inline float DepthMap::doLineStereo(
     // inverse depth derived by the pixel-disparity.
     Eigen::Vector3f RKinvP = referenceFrame->otherToThis_R * KinvP;
     float alpha;
+
+    const Eigen::Vector3f inv_cp = KInv * tohomogeneous(argmin_cp);
+
+    Eigen::Vector2f nominators = (inv_cp.head(2)*referenceFrame->otherToThis_t[2] -
+                                  referenceFrame->otherToThis_t.head(2));
+    Eigen::Vector2f idnew_best_matches =
+        (RKinvP.head(2) - inv_cp.head(2)*RKinvP[2]).array() /
+        nominators.head(2).array();
+
     if(inc[0]*inc[0]>inc[1]*inc[1]) {
-        float oldX = fxi*argmin_cp[0]+cxi;
-        float nominator = (oldX*referenceFrame->otherToThis_t[2] -
-                           referenceFrame->otherToThis_t[0]);
-        idnew_best_match = (RKinvP[0] - oldX*RKinvP[2]) / nominator;
+        idnew_best_match = idnew_best_matches[0];
         alpha = inc[0]*fxi*(RKinvP[0]*referenceFrame->otherToThis_t[2] -
-                            RKinvP[2]*referenceFrame->otherToThis_t[0]) / (nominator*nominator);
+                            RKinvP[2]*referenceFrame->otherToThis_t[0]) /
+                            (nominators[0]*nominators[0]);
     } else {
-        float oldY = fyi*argmin_cp[1]+cyi;
-        float nominator = (oldY*referenceFrame->otherToThis_t[2] -
-                           referenceFrame->otherToThis_t[1]);
-        idnew_best_match = (RKinvP[1] - oldY*RKinvP[2]) / nominator;
+        idnew_best_match = idnew_best_matches[1];
         alpha = inc[1]*fyi*(RKinvP[1]*referenceFrame->otherToThis_t[2] -
-                            RKinvP[2]*referenceFrame->otherToThis_t[1]) / (nominator*nominator);
+                            RKinvP[2]*referenceFrame->otherToThis_t[1]) /
+                            (nominators[1]*nominators[1]);
     }
 
     if(idnew_best_match < 0) {
@@ -2000,7 +2004,7 @@ inline float DepthMap::doLineStereo(
     // calculate error from geometric noise (wrong camera pose / calibration)
     Eigen::Vector2f gradsInterp = getInterpolatedElement42(
                                       activeKeyFrame->gradients(0), u, v, width);
-    float geoDispError = (gradsInterp[0]*epxn + gradsInterp[1]*epyn)
+    float geoDispError = epipolar_direction.dot(gradsInterp)
                        + DIVISION_EPS;
     geoDispError = trackingErrorFac*trackingErrorFac*(gradsInterp[0]*gradsInterp[0]
                    + gradsInterp[1]*gradsInterp[1]) / (geoDispError*geoDispError);
