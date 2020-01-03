@@ -1791,10 +1791,9 @@ inline float DepthMap::doLineStereo(
      *    where i is the respective winning index.
      */
 
-
     // walk in equally sized steps, starting at depth=infinity.
     Eigen::Vector2f argmin_cp(-1, -1);
-    float curr_error = 1e50;
+    float min_error = 1e50;
     float second_min_error = 1e50;
 
     // best pre and post errors.
@@ -1832,13 +1831,13 @@ inline float DepthMap::doLineStereo(
         float error = (ref_intensities - key_intensities).squaredNorm();
         // do I have a new winner??
         // if so: set.
-        if(error < curr_error) {
+        if(error < min_error) {
             // put to second-best
-            second_min_error = curr_error;
+            second_min_error = min_error;
             second_argmin = curr_argmin;
 
             // set best.
-            curr_error = error;
+            min_error = error;
             curr_argmin = i;
 
             prev_error = prev_error_;
@@ -1873,17 +1872,14 @@ inline float DepthMap::doLineStereo(
     }
 
     // if error too big, will return -3, otherwise -2.
-    if(curr_error > 4*(float)MAX_ERROR_STEREO)
-    {
+    if(min_error > 4*(float)MAX_ERROR_STEREO) {
         if(enablePrintDebugInfo) stats->num_stereo_invalid_bigErr++;
         return -3;
     }
 
-
     // check if clear enough winner
     if(abs(curr_argmin - second_argmin) > 1 &&
-       MIN_DISTANCE_ERROR_STEREO * curr_error > second_min_error)
-    {
+       MIN_DISTANCE_ERROR_STEREO * min_error > second_min_error) {
         if(enablePrintDebugInfo) stats->num_stereo_invalid_unclear_winner++;
         return -2;
     }
@@ -1896,8 +1892,8 @@ inline float DepthMap::doLineStereo(
         // ================== compute exact match =========================
         // compute gradients (they are actually only half the real gradient)
         float grad_prev_prev = -(prev_error - prev_diff);
-        float grad_prev_curr = +(curr_error - prev_diff);
-        float grad_next_curr = -(curr_error - next_diff);
+        float grad_prev_curr = +(min_error - prev_diff);
+        float grad_next_curr = -(min_error - next_diff);
         float grad_next_next = +(next_error - next_diff);
 
         // if one is oob: return false.
@@ -1933,13 +1929,13 @@ inline float DepthMap::doLineStereo(
         if(interpolate_prev) {
             float d = grad_prev_curr / (grad_prev_curr - grad_prev_prev);
             argmin_cp -= d*inc;
-            curr_error = curr_error - 2*d*grad_prev_curr
+            min_error = min_error - 2*d*grad_prev_curr
                        - (grad_prev_prev - grad_prev_curr)*d*d;
             if(enablePrintDebugInfo) stats->num_stereo_interpPre++;
         } else if(interpolate_next) {
             float d = grad_next_curr / (grad_next_curr - grad_next_next);
             argmin_cp += d*inc;
-            curr_error = curr_error + 2*d*grad_next_curr
+            min_error = min_error + 2*d*grad_next_curr
                        + (grad_next_next - grad_next_curr)*d*d;
             if(enablePrintDebugInfo) stats->num_stereo_interpPost++;
         } else {
@@ -1954,14 +1950,15 @@ inline float DepthMap::doLineStereo(
     float gradAlongLine = calc_grad_along_line(key_intensities, sampleDist);
 
     // check if interpolated error is OK. use evil hack to allow more error if there is a lot of gradient.
-    if(curr_error > (float)MAX_ERROR_STEREO + sqrtf(gradAlongLine)*20)
+    if(min_error > (float)MAX_ERROR_STEREO + sqrtf(gradAlongLine)*20)
     {
         if(enablePrintDebugInfo) stats->num_stereo_invalid_bigErr++;
         return -3;
     }
 
     // ================= calc depth (in KF) ====================
-    // * KinvP = Kinv * (x,y,1); where x,y are pixel coordinates of point we search for, in the KF.
+    // * KinvP = Kinv * (x,y,1); where x,y are pixel coordinates of point we search for,
+    // in the KF.
     // * argmin_cp[0] = x-coordinate of found correspondence in the reference frame.
 
     float idnew_best_match;	// depth in the new image
@@ -2043,7 +2040,7 @@ inline float DepthMap::doLineStereo(
 //			float pixelDistFound = sqrtf((float)((pReal[0]/pReal[2] - argmin_cp[0])*(pReal[0]/pReal[2] - argmin_cp[0])
 //					+ (pReal[1]/pReal[2] - argmin_cp[1])*(pReal[1]/pReal[2] - argmin_cp[1])));
 //
-            float fac = curr_error / (
+            float fac = min_error / (
                 (float)MAX_ERROR_STEREO + sqrtf(gradAlongLine) * 20
             );
 
@@ -2066,7 +2063,7 @@ inline float DepthMap::doLineStereo(
 
     result_eplLength = eplLength;
 
-    return curr_error;
+    return min_error;
 }
 
 }
