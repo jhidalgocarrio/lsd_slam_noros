@@ -100,22 +100,25 @@ inline Eigen::Vector4f getInterpolatedElement44(const Eigen::Vector4f* const
            + (1-dx-dy+dxdy) * *(bp);
 }
 
-inline Eigen::Vector2f getInterpolatedElement42(const Eigen::Vector4f* const
-        mat, const float x, const float y, const int width)
-{
-    int ix = (int)x;
-    int iy = (int)y;
-    float dx = x - ix;
-    float dy = y - iy;
-    float dxdy = dx*dy;
-    const Eigen::Vector4f* bp = mat +ix+iy*width;
+inline Eigen::Vector2f getInterpolatedElement42(const Eigen::Vector4f* const mat,
+                                                const Eigen::Vector2f &coordinate,
+                                                const int width) {
+    const float x = coordinate[0];
+    const float y = coordinate[1];
 
+    const int ix = (int)x;
+    const int iy = (int)y;
+    const float dx = x - ix;
+    const float dy = y - iy;
+    const float dxdy = dx*dy;
+    const Eigen::Vector4f* bp = mat +ix+iy*width;
 
     return dxdy * *(const Eigen::Vector2f*)(bp+1+width)
            + (dy-dxdy) * *(const Eigen::Vector2f*)(bp+width)
            + (dx-dxdy) * *(const Eigen::Vector2f*)(bp+1)
            + (1-dx-dy+dxdy) * *(const Eigen::Vector2f*)(bp);
 }
+
 inline void fillCvMat(cv::Mat* mat, cv::Vec3b color)
 {
     for(int y=0; y<mat->size().height; y++)

@@ -1715,24 +1715,18 @@ inline float DepthMap::doLineStereo(
        pClose[0] >= width-SAMPLE_POINT_TO_BORDER ||
        pClose[1] <= SAMPLE_POINT_TO_BORDER ||
        pClose[1] >= height-SAMPLE_POINT_TO_BORDER) {
-        if(pClose[0] <= SAMPLE_POINT_TO_BORDER)
-        {
+        if(pClose[0] <= SAMPLE_POINT_TO_BORDER) {
             float toAdd = (SAMPLE_POINT_TO_BORDER - pClose[0]) / inc[0];
             pClose += toAdd * inc;
-        }
-        else if(pClose[0] >= width-SAMPLE_POINT_TO_BORDER)
-        {
+        } else if(pClose[0] >= width-SAMPLE_POINT_TO_BORDER) {
             float toAdd = (width-SAMPLE_POINT_TO_BORDER - pClose[0]) / inc[0];
             pClose += toAdd * inc;
         }
 
-        if(pClose[1] <= SAMPLE_POINT_TO_BORDER)
-        {
+        if(pClose[1] <= SAMPLE_POINT_TO_BORDER) {
             float toAdd = (SAMPLE_POINT_TO_BORDER - pClose[1]) / inc[1];
             pClose += toAdd * inc;
-        }
-        else if(pClose[1] >= height-SAMPLE_POINT_TO_BORDER)
-        {
+        } else if(pClose[1] >= height-SAMPLE_POINT_TO_BORDER) {
             float toAdd = (height-SAMPLE_POINT_TO_BORDER - pClose[1]) / inc[1];
             pClose += toAdd * inc;
         }
@@ -2003,12 +1997,11 @@ inline float DepthMap::doLineStereo(
 
     // calculate error from geometric noise (wrong camera pose / calibration)
     Eigen::Vector2f gradsInterp = getInterpolatedElement42(
-                                      activeKeyFrame->gradients(0), u, v, width);
+        activeKeyFrame->gradients(0), keyframe_coordinate, width);
     float geoDispError = epipolar_direction.dot(gradsInterp)
                        + DIVISION_EPS;
-    geoDispError = trackingErrorFac*trackingErrorFac*(gradsInterp[0]*gradsInterp[0]
-                   + gradsInterp[1]*gradsInterp[1]) / (geoDispError*geoDispError);
-
+    geoDispError = trackingErrorFac*trackingErrorFac*gradsInterp.squaredNorm()
+                 / (geoDispError*geoDispError);
 
     //geoDispError *= (0.5 + 0.5 *result_idepth) * (0.5 + 0.5 *result_idepth);
 
