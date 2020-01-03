@@ -1608,15 +1608,11 @@ inline float DepthMap::doLineStereo(
     const float min_idepth, const float prior_idepth, float max_idepth,
     const Frame* const referenceFrame, const float* referenceFrameImage,
     float &result_idepth, float &result_var, float &result_eplLength,
-    RunningStats* stats)
-{
-    const float u = keyframe_coordinate[0];
-    const float v = keyframe_coordinate[1];
-
+    RunningStats* stats) {
     if(enablePrintDebugInfo) stats->num_stereo_calls++;
 
     // calculate epipolar line start and end point in old image
-    Eigen::Vector3f KinvP = Eigen::Vector3f(fxi*u+cxi, fyi*v+cyi, 1);
+    Eigen::Vector3f KinvP = KInv * tohomogeneous(keyframe_coordinate);
     Eigen::Vector3f pInf = referenceFrame->K_otherToThis_R * KinvP;
     Eigen::Vector3f pReal = pInf / prior_idepth + referenceFrame->K_otherToThis_t;
 
