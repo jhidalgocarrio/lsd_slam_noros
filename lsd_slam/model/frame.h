@@ -193,6 +193,7 @@ public:
     Eigen::Vector3f otherToThis_t;
     Eigen::Vector3f K_thisToOther_t;
     Eigen::Matrix3f thisToOther_R;
+    Eigen::Matrix3f otherToThis_R;
     Eigen::Vector3f otherToThis_R_row0;
     Eigen::Vector3f otherToThis_R_row1;
     Eigen::Vector3f otherToThis_R_row2;

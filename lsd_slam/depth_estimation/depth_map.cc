@@ -1962,34 +1962,27 @@ inline float DepthMap::doLineStereo(
     // * argmin_cp[0] = x-coordinate of found correspondence in the reference frame.
 
     float idnew_best_match;	// depth in the new image
-    float alpha; // d(idnew_best_match) / d(disparity in pixel) == conputed inverse depth derived by the pixel-disparity.
-    if(inc[0]*inc[0]>inc[1]*inc[1])
-    {
+    // d(idnew_best_match) / d(disparity in pixel) == conputed
+    // inverse depth derived by the pixel-disparity.
+    Eigen::Vector3f RKinvP = referenceFrame->otherToThis_R * KinvP;
+    float alpha;
+    if(inc[0]*inc[0]>inc[1]*inc[1]) {
         float oldX = fxi*argmin_cp[0]+cxi;
         float nominator = (oldX*referenceFrame->otherToThis_t[2] -
                            referenceFrame->otherToThis_t[0]);
-        float dot0 = KinvP.dot(referenceFrame->otherToThis_R_row0);
-        float dot2 = KinvP.dot(referenceFrame->otherToThis_R_row2);
-
-        idnew_best_match = (dot0 - oldX*dot2) / nominator;
-        alpha = inc[0]*fxi*(dot0*referenceFrame->otherToThis_t[2] -
-                            dot2*referenceFrame->otherToThis_t[0]) / (nominator*nominator);
-
+        idnew_best_match = (RKinvP[0] - oldX*RKinvP[2]) / nominator;
+        alpha = inc[0]*fxi*(RKinvP[0]*referenceFrame->otherToThis_t[2] -
+                            RKinvP[2]*referenceFrame->otherToThis_t[0]) / (nominator*nominator);
     } else {
         float oldY = fyi*argmin_cp[1]+cyi;
         float nominator = (oldY*referenceFrame->otherToThis_t[2] -
                            referenceFrame->otherToThis_t[1]);
-        float dot1 = KinvP.dot(referenceFrame->otherToThis_R_row1);
-        float dot2 = KinvP.dot(referenceFrame->otherToThis_R_row2);
-
-        idnew_best_match = (dot1 - oldY*dot2) / nominator;
-        alpha = inc[1]*fyi*(dot1*referenceFrame->otherToThis_t[2] -
-                            dot2*referenceFrame->otherToThis_t[1]) / (nominator*nominator);
-
+        idnew_best_match = (RKinvP[1] - oldY*RKinvP[2]) / nominator;
+        alpha = inc[1]*fyi*(RKinvP[1]*referenceFrame->otherToThis_t[2] -
+                            RKinvP[2]*referenceFrame->otherToThis_t[1]) / (nominator*nominator);
     }
 
-    if(idnew_best_match < 0)
-    {
+    if(idnew_best_match < 0) {
         if(enablePrintDebugInfo) stats->num_stereo_negative++;
         if(!allowNegativeIdepths)
             return -2;
