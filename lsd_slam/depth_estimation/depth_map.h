@@ -138,7 +138,7 @@ private:
     // does the line-stereo seeking.
     // takes a lot of parameters, because they all have been pre-computed before.
     inline float doLineStereo(
-        const Eigen::Vector2f &keyframe_coordinate, const Eigen::Vector2f &epn,
+        const Eigen::Vector2i &keyframe_coordinate,
         const float min_idepth, const float prior_idepth, float max_idepth,
         const Frame* const referenceFrame, const float* referenceFrameImage,
         float &result_idepth, float &result_var, float &result_eplLength,

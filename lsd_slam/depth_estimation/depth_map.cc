@@ -274,17 +274,12 @@ bool DepthMap::observeDepthCreate(const Eigen::Vector2i &keyframe_coordinate,
         }
     }
 
-    Eigen::Vector2f epipolar_line;
-    bool isGood = makeAndCheckEPL(keyframe_coordinate, refFrame, epipolar_line, stats);
-    if(!isGood) return false;
 
     if(enablePrintDebugInfo) stats->num_observe_create_attempted++;
 
     float result_idepth, result_var, result_eplLength;
-    const Eigen::Vector2f p(x, y);
     float error = doLineStereo(
-                      p, epipolar_line,
-                      0.0f, 1.0f, 1.0f/MIN_DEPTH,
+                      keyframe_coordinate, 0.0f, 1.0f, 1.0f/MIN_DEPTH,
                       refFrame, refFrame->image(0),
                       result_idepth, result_var, result_eplLength, stats);
 
@@ -362,10 +357,6 @@ bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate,
         }
     }
 
-    Eigen::Vector2f epipolar_line;
-    bool isGood = makeAndCheckEPL(keyframe_coordinate, refFrame, epipolar_line, stats);
-    if(!isGood) return false;
-
     // which exact point to track, and where from.
     float sv = sqrt(target->idepth_var_smoothed);
     float min_idepth = target->idepth_smoothed - sv*STEREO_EPL_VAR_FAC;
@@ -377,15 +368,16 @@ bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate,
 
     float result_idepth, result_var, result_eplLength;
 
-    const Eigen::Vector2f p(x, y);
     float error = doLineStereo(
-                      p, epipolar_line,
-                      min_idepth, target->idepth_smoothed,max_idepth,
+                      keyframe_coordinate, min_idepth,
+                      target->idepth_smoothed, max_idepth,
                       refFrame, refFrame->image(0),
                       result_idepth, result_var, result_eplLength, stats);
 
     float diff = result_idepth - target->idepth_smoothed;
-
+    if(error == -5) {
+        return false;
+    }
 
     // if oob: (really out of bounds)
     if(error == -1)
@@ -1604,12 +1596,19 @@ bool is_in_image_range(const Eigen::Vector2f &keypoint,
 // returns: idepth_var: (approximated) measurement variance of inverse depth of result_point_NEW
 // returns error if sucessful; -1 if out of bounds, -2 if not found.
 inline float DepthMap::doLineStereo(
-    const Eigen::Vector2f &keyframe_coordinate, const Eigen::Vector2f &epipolar_direction,
+    const Eigen::Vector2i &keyframe_coordinate_,
     const float min_idepth, const float prior_idepth, float max_idepth,
     const Frame* const referenceFrame, const float* referenceFrameImage,
     float &result_idepth, float &result_var, float &result_eplLength,
     RunningStats* stats) {
+    Eigen::Vector2f epipolar_direction;
+    bool isGood = makeAndCheckEPL(keyframe_coordinate_, referenceFrame,
+                                  epipolar_direction, stats);
+    if(!isGood) return -5;
+
     if(enablePrintDebugInfo) stats->num_stereo_calls++;
+
+    Eigen::Vector2f keyframe_coordinate = keyframe_coordinate_.cast<float>();
 
     // calculate epipolar line start and end point in old image
     Eigen::Vector3f KinvP = KInv * tohomogeneous(keyframe_coordinate);
