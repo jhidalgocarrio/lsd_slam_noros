@@ -141,37 +141,32 @@ private:
         const Eigen::Vector2i &keyframe_coordinate,
         const float min_idepth, const float prior_idepth, float max_idepth,
         const Frame* const referenceFrame, const float* referenceFrameImage,
-        float &result_idepth, float &result_var, float &result_eplLength,
-        RunningStats* const stats);
+        float &result_idepth, float &result_var, float &result_eplLength);
 
 
     void propagateDepth(Frame* new_keyframe);
 
 
     void observeDepth();
-    void observeDepthRow(int yMin, int yMax, RunningStats* stats);
-    bool observeDepthCreate(const Eigen::Vector2i &keyframe_coordinate, const int &idx,
-                            RunningStats* const &stats);
+    void observeDepthRow(int yMin, int yMax);
+    bool observeDepthCreate(const Eigen::Vector2i &keyframe_coordinate, const int &idx);
     bool observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate, const int &idx,
-                            const float* keyFrameMaxGradBuf, RunningStats* const &stats);
+                            const float* keyFrameMaxGradBuf);
 
     bool makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
                          const Frame* const ref,
-                         Eigen::Vector2f &pep,
-                         RunningStats* const stats);
+                         Eigen::Vector2f &pep);
 
     void regularizeDepthMap(bool removeOcclusion, int validityTH);
-    template<bool removeOcclusions> void regularizeDepthMapRow(int validityTH,
-            int yMin, int yMax, RunningStats* stats);
+    template<bool removeOcclusions> void regularizeDepthMapRow(
+          int validityTH, int yMin, int yMax);
 
 
     void buildRegIntegralBuffer();
-    void buildRegIntegralBufferRow1(int yMin, int yMax, RunningStats* stats);
+    void buildRegIntegralBufferRow1(int yMin, int yMax);
     void regularizeDepthMapFillHoles();
-    void regularizeDepthMapFillHolesRow(int yMin, int yMax, RunningStats* stats);
+    void regularizeDepthMapFillHolesRow(int yMin, int yMax);
 
-
-    void resetCounters();
 
     //float clocksPropagate, clocksPropagateKF, clocksObserve, msObserve, clocksReg1, clocksReg2, msReg1, msReg2, clocksFinalize;
 };

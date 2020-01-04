@@ -120,7 +120,7 @@ void DepthMap::reset()
 }
 
 
-void DepthMap::observeDepthRow(int yMin, int yMax, RunningStats* stats) {
+void DepthMap::observeDepthRow(int yMin, int yMax) {
     const float* keyFrameMaxGradBuf = activeKeyFrame->maxGradients(0);
 
     int successes = 0;
@@ -146,10 +146,10 @@ void DepthMap::observeDepthRow(int yMin, int yMax, RunningStats* stats) {
 
             bool success;
             if(!hasHypothesis)
-                success = observeDepthCreate(keyframe_coordinate, idx, stats);
+                success = observeDepthCreate(keyframe_coordinate, idx);
             else
                 success = observeDepthUpdate(keyframe_coordinate, idx,
-                                             keyFrameMaxGradBuf, stats);
+                                             keyFrameMaxGradBuf);
 
             if(success)
                 successes++;
@@ -159,43 +159,14 @@ void DepthMap::observeDepthRow(int yMin, int yMax, RunningStats* stats) {
 }
 void DepthMap::observeDepth()
 {
-
-    threadReducer.reduce(boost::bind(&DepthMap::observeDepthRow, this, _1, _2, _3),
+    threadReducer.reduce(boost::bind(&DepthMap::observeDepthRow, this, _1, _2),
                          3, height-3, 10);
-
-    if(enablePrintDebugInfo && printObserveStatistics)
-    {
-        printf("OBSERVE (%d): %d / %d created; %d / %d updated; %d skipped; %d init-blacklisted\n",
-               activeKeyFrame->id(),
-               runningStats.num_observe_created,
-               runningStats.num_observe_create_attempted,
-               runningStats.num_observe_updated,
-               runningStats.num_observe_update_attempted,
-               runningStats.num_observe_skip_alreadyGood,
-               runningStats.num_observe_blacklisted
-              );
-    }
-
-
-    if(enablePrintDebugInfo && printObservePurgeStatistics)
-    {
-        printf("OBS-PRG (%d): Good: %d; inconsistent: %d; notfound: %d; oob: %d; failed: %d; addSkip: %d;\n",
-               activeKeyFrame->id(),
-               runningStats.num_observe_good,
-               runningStats.num_observe_inconsistent,
-               runningStats.num_observe_notfound,
-               runningStats.num_observe_skip_oob,
-               runningStats.num_observe_skip_fail,
-               runningStats.num_observe_addSkip
-              );
-    }
 }
 
 
 bool DepthMap::makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
                                const Frame* const ref,
-                               Eigen::Vector2f &pep,
-                               RunningStats* const stats) {
+                               Eigen::Vector2f &pep) {
     const int x = keyframe_coordinate[0];
     const int y = keyframe_coordinate[1];
 
@@ -214,7 +185,7 @@ bool DepthMap::makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
     const float eplLengthSquared = epipolar_line.squaredNorm();
 
     if(eplLengthSquared < MIN_EPL_LENGTH_SQUARED) {
-        if(enablePrintDebugInfo) stats->num_observe_skipped_small_epl++;
+        // stats->num_observe_skipped_small_epl++;
         return false;
     }
 
@@ -229,13 +200,13 @@ bool DepthMap::makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
     eplGradSquared = eplGradSquared*eplGradSquared / eplLengthSquared;
 
     if(eplGradSquared < MIN_EPL_GRAD_SQUARED) {
-        if(enablePrintDebugInfo) stats->num_observe_skipped_small_epl_grad++;
+        // stats->num_observe_skipped_small_epl_grad++;
         return false;
     }
 
     // ===== check epl-grad angle ======
     if(eplGradSquared / grad.squaredNorm() < MIN_EPL_ANGLE_SQUARED) {
-        if(enablePrintDebugInfo) stats->num_observe_skipped_small_epl_angle++;
+        // stats->num_observe_skipped_small_epl_angle++;
         return false;
     }
 
@@ -249,8 +220,7 @@ bool DepthMap::makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
 
 
 bool DepthMap::observeDepthCreate(const Eigen::Vector2i &keyframe_coordinate,
-                                  const int &idx,
-                                  RunningStats* const &stats)
+                                  const int &idx)
 {
     DepthMapPixelHypothesis* target = currentDepthMap+idx;
 
@@ -275,18 +245,18 @@ bool DepthMap::observeDepthCreate(const Eigen::Vector2i &keyframe_coordinate,
     }
 
 
-    if(enablePrintDebugInfo) stats->num_observe_create_attempted++;
+    // stats->num_observe_create_attempted++;
 
     float result_idepth, result_var, result_eplLength;
     float error = doLineStereo(
                       keyframe_coordinate, 0.0f, 1.0f, 1.0f/MIN_DEPTH,
                       refFrame, refFrame->image(0),
-                      result_idepth, result_var, result_eplLength, stats);
+                      result_idepth, result_var, result_eplLength);
 
     if(error == -3 || error == -2)
     {
         target->blacklisted--;
-        if(enablePrintDebugInfo) stats->num_observe_blacklisted++;
+        // stats->num_observe_blacklisted++;
     }
 
     if(error < 0 || result_var > MAX_VAR)
@@ -304,15 +274,14 @@ bool DepthMap::observeDepthCreate(const Eigen::Vector2i &keyframe_coordinate,
         debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(255,255,
                 255); // white for GOT CREATED
 
-    if(enablePrintDebugInfo) stats->num_observe_created++;
+    // stats->num_observe_created++;
 
     return true;
 }
 
 bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate,
                                   const int &idx,
-                                  const float* keyFrameMaxGradBuf,
-                                  RunningStats* const &stats)
+                                  const float* keyFrameMaxGradBuf)
 {
     DepthMapPixelHypothesis* target = currentDepthMap+idx;
     Frame* refFrame;
@@ -328,7 +297,7 @@ bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate,
                 // GREEN FOR skip
                 debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(0,255, 0);
 
-            if(enablePrintDebugInfo) stats->num_observe_skip_alreadyGood++;
+            // stats->num_observe_skip_alreadyGood++;
             return false;
         }
 
@@ -364,7 +333,7 @@ bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate,
     if(min_idepth < 0) min_idepth = 0;
     if(max_idepth > 1/MIN_DEPTH) max_idepth = 1/MIN_DEPTH;
 
-    stats->num_observe_update_attempted++;
+    // stats->num_observe_update_attempted++;
 
     float result_idepth, result_var, result_eplLength;
 
@@ -372,7 +341,7 @@ bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate,
                       keyframe_coordinate, min_idepth,
                       target->idepth_smoothed, max_idepth,
                       refFrame, refFrame->image(0),
-                      result_idepth, result_var, result_eplLength, stats);
+                      result_idepth, result_var, result_eplLength);
 
     float diff = result_idepth - target->idepth_smoothed;
     if(error == -5) {
@@ -383,7 +352,7 @@ bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate,
     if(error == -1)
     {
         // do nothing, pixel got oob, but is still in bounds in original. I will want to try again.
-        if(enablePrintDebugInfo) stats->num_observe_skip_oob++;
+        // stats->num_observe_skip_oob++;
 
         if(plotStereoImages)
             debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(0,0,
@@ -394,7 +363,7 @@ bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate,
     // if just not good for stereo (e.g. some inf / nan occured; has inconsistent minimum; ..)
     else if(error == -2)
     {
-        if(enablePrintDebugInfo) stats->num_observe_skip_fail++;
+        // stats->num_observe_skip_fail++;
 
         if(plotStereoImages)
             debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(255,0,
@@ -419,7 +388,7 @@ bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate,
     // if not found (error too high)
     else if(error == -3)
     {
-        if(enablePrintDebugInfo) stats->num_observe_notfound++;
+        // stats->num_observe_notfound++;
         if(plotStereoImages)
             debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(0,0,
                     0);	// BLACK FOR big not-found
@@ -440,7 +409,7 @@ bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate,
     // if inconsistent
     else if(DIFF_FAC_OBSERVE*diff*diff > result_var + target->idepth_var_smoothed)
     {
-        if(enablePrintDebugInfo) stats->num_observe_inconsistent++;
+        // stats->num_observe_inconsistent++;
         if(plotStereoImages)
             debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(255,255,
                     0);	// Turkoise FOR big inconsistent
@@ -455,9 +424,9 @@ bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate,
     else
     {
         // one more successful observation!
-        if(enablePrintDebugInfo) stats->num_observe_good++;
+        // stats->num_observe_good++;
 
-        if(enablePrintDebugInfo) stats->num_observe_updated++;
+        // stats->num_observe_updated++;
 
 
         // do textbook ekf update:
@@ -491,7 +460,7 @@ bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate,
 
             inc +=  ((int)(result_eplLength*10000)%2);
 
-            if(enablePrintDebugInfo) stats->num_observe_addSkip++;
+            // stats->num_observe_addSkip++;
 
             if(result_eplLength < 0.5*MIN_EPL_LENGTH_CROP)
                 inc *= 3;
@@ -508,19 +477,7 @@ bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate,
     }
 }
 
-void DepthMap::propagateDepth(Frame* new_keyframe)
-{
-    runningStats.num_prop_removed_out_of_bounds = 0;
-    runningStats.num_prop_removed_colorDiff = 0;
-    runningStats.num_prop_removed_validity = 0;
-    runningStats.num_prop_grad_decreased = 0;
-    runningStats.num_prop_color_decreased = 0;
-    runningStats.num_prop_attempts = 0;
-    runningStats.num_prop_occluded = 0;
-    runningStats.num_prop_created = 0;
-    runningStats.num_prop_merged = 0;
-
-
+void DepthMap::propagateDepth(Frame* new_keyframe) {
     if(new_keyframe->getTrackingParent() != activeKeyFrame)
     {
         printf("WARNING: propagating depth from frame %d to %d, which was tracked on a different frame (%d).\nWhile this should work, it is not recommended.",
@@ -564,7 +521,7 @@ void DepthMap::propagateDepth(Frame* new_keyframe)
             if(!source->isValid)
                 continue;
 
-            if(enablePrintDebugInfo) runningStats.num_prop_attempts++;
+            // runningStats.num_prop_attempts++;
 
 
             Eigen::Vector3f pn = (trafoInv_R * Eigen::Vector3f(x*fxi + cxi,y*fyi + cyi,
@@ -579,7 +536,7 @@ void DepthMap::propagateDepth(Frame* new_keyframe)
             if(!(u_new > 2.1f && v_new > 2.1f && u_new < width-3.1f
                     && v_new < height-3.1f))
             {
-                if(enablePrintDebugInfo) runningStats.num_prop_removed_out_of_bounds++;
+                // runningStats.num_prop_removed_out_of_bounds++;
                 continue;
             }
 
@@ -593,7 +550,7 @@ void DepthMap::propagateDepth(Frame* new_keyframe)
                                     (y >> SE3TRACKING_MIN_LEVEL)]
                         || destAbsGrad < MIN_ABS_GRAD_DECREASE)
                 {
-                    if(enablePrintDebugInfo) runningStats.num_prop_removed_colorDiff++;
+                    // runningStats.num_prop_removed_colorDiff++;
                     continue;
                 }
             }
@@ -611,7 +568,7 @@ void DepthMap::propagateDepth(Frame* new_keyframe)
                                         MAX_DIFF_GRAD_MULT*destAbsGrad*destAbsGrad) > 1
                         || destAbsGrad < MIN_ABS_GRAD_DECREASE)
                 {
-                    if(enablePrintDebugInfo) runningStats.num_prop_removed_colorDiff++;
+                    // runningStats.num_prop_removed_colorDiff++;
                     continue;
                 }
             }
@@ -638,12 +595,12 @@ void DepthMap::propagateDepth(Frame* new_keyframe)
                 {
                     if(new_idepth < targetBest->idepth)
                     {
-                        if(enablePrintDebugInfo) runningStats.num_prop_occluded++;
+                        // runningStats.num_prop_occluded++;
                         continue;
                     }
                     else
                     {
-                        if(enablePrintDebugInfo) runningStats.num_prop_occluded++;
+                        // runningStats.num_prop_occluded++;
                         targetBest->isValid = false;
                     }
                 }
@@ -652,7 +609,7 @@ void DepthMap::propagateDepth(Frame* new_keyframe)
 
             if(!targetBest->isValid)
             {
-                if(enablePrintDebugInfo) runningStats.num_prop_created++;
+                // runningStats.num_prop_created++;
 
                 *targetBest = DepthMapPixelHypothesis(
                                   new_idepth,
@@ -662,7 +619,7 @@ void DepthMap::propagateDepth(Frame* new_keyframe)
             }
             else
             {
-                if(enablePrintDebugInfo) runningStats.num_prop_merged++;
+                // runningStats.num_prop_merged++;
 
                 // merge idepth ekf-style
                 float w = new_var / (targetBest->idepth_var + new_var);
@@ -682,28 +639,10 @@ void DepthMap::propagateDepth(Frame* new_keyframe)
 
     // swap!
     std::swap(currentDepthMap, otherDepthMap);
-
-
-    if(enablePrintDebugInfo && printPropagationStatistics)
-    {
-        printf("PROPAGATE: %d: %d drop (%d oob, %d color); %d created; %d merged; %d occluded. %d col-dec, %d grad-dec.\n",
-               runningStats.num_prop_attempts,
-               runningStats.num_prop_removed_validity +
-               runningStats.num_prop_removed_out_of_bounds +
-               runningStats.num_prop_removed_colorDiff,
-               runningStats.num_prop_removed_out_of_bounds,
-               runningStats.num_prop_removed_colorDiff,
-               runningStats.num_prop_created,
-               runningStats.num_prop_merged,
-               runningStats.num_prop_occluded,
-               runningStats.num_prop_color_decreased,
-               runningStats.num_prop_grad_decreased);
-    }
 }
 
 
-void DepthMap::regularizeDepthMapFillHolesRow(int yMin, int yMax,
-        RunningStats* stats)
+void DepthMap::regularizeDepthMapFillHolesRow(int yMin, int yMax)
 {
     // =========== regularize fill holes
     const float* keyFrameMaxGradBuf = activeKeyFrame->maxGradients(0);
@@ -748,7 +687,7 @@ void DepthMap::regularizeDepthMapFillHolesRow(int yMin, int yMax,
                         VAR_RANDOM_INIT_INITIAL,
                         0);
 
-                if(enablePrintDebugInfo) stats->num_reg_created++;
+                // stats->num_reg_created++;
             }
         }
     }
@@ -760,21 +699,15 @@ void DepthMap::regularizeDepthMapFillHoles()
 
     buildRegIntegralBuffer();
 
-    runningStats.num_reg_created=0;
-
     memcpy(otherDepthMap,currentDepthMap,
            width*height*sizeof(DepthMapPixelHypothesis));
     threadReducer.reduce(boost::bind(&DepthMap::regularizeDepthMapFillHolesRow,
-                                     this, _1, _2, _3), 3, height-2, 10);
-    if(enablePrintDebugInfo && printFillHolesStatistics)
-        printf("FillHoles (discreteDepth): %d created\n",
-               runningStats.num_reg_created);
+                                     this, _1, _2), 3, height-2, 10);
 }
 
 
 
-void DepthMap::buildRegIntegralBufferRow1(int yMin, int yMax,
-        RunningStats* stats)
+void DepthMap::buildRegIntegralBufferRow1(int yMin, int yMax)
 {
     // ============ build inegral buffers
     int* validityIntegralBufferPT = validityIntegralBuffer+yMin*width;
@@ -797,8 +730,9 @@ void DepthMap::buildRegIntegralBufferRow1(int yMin, int yMax,
 
 void DepthMap::buildRegIntegralBuffer()
 {
-    threadReducer.reduce(boost::bind(&DepthMap::buildRegIntegralBufferRow1, this,
-                                     _1, _2,_3), 0, height);
+    threadReducer.reduce(boost::bind(&DepthMap::buildRegIntegralBufferRow1,
+                                     this, _1, _2),
+                         0, height);
 
     int* validityIntegralBufferPT = validityIntegralBuffer;
     int* validityIntegralBufferPT_T = validityIntegralBuffer+width;
@@ -812,7 +746,7 @@ void DepthMap::buildRegIntegralBuffer()
 
 
 template<bool removeOcclusions> void DepthMap::regularizeDepthMapRow(
-    int validityTH, int yMin, int yMax, RunningStats* stats)
+    int validityTH, int yMin, int yMax)
 {
     const int regularize_radius = 2;
 
@@ -827,8 +761,9 @@ template<bool removeOcclusions> void DepthMap::regularizeDepthMapRow(
 
             // if isValid need to do better examination and then update.
 
-            if(enablePrintDebugInfo && destRead->blacklisted < MIN_BLACKLIST)
-                stats->num_reg_blacklisted++;
+            if(destRead->blacklisted < MIN_BLACKLIST) {
+                // stats->num_reg_blacklisted++;
+            }
 
             if(!destRead->isValid)
                 continue;
@@ -872,10 +807,10 @@ template<bool removeOcclusions> void DepthMap::regularizeDepthMapRow(
             if(val_sum < validityTH)
             {
                 dest->isValid = false;
-                if(enablePrintDebugInfo) stats->num_reg_deleted_secondary++;
+                // stats->num_reg_deleted_secondary++;
                 dest->blacklisted--;
 
-                if(enablePrintDebugInfo) stats->num_reg_setBlacklisted++;
+                // stats->num_reg_setBlacklisted++;
                 continue;
             }
 
@@ -885,7 +820,7 @@ template<bool removeOcclusions> void DepthMap::regularizeDepthMapRow(
                 if(numOccluding > numNotOccluding)
                 {
                     dest->isValid = false;
-                    if(enablePrintDebugInfo) stats->num_reg_deleted_occluded++;
+                    // stats->num_reg_deleted_occluded++;
 
                     continue;
                 }
@@ -899,46 +834,27 @@ template<bool removeOcclusions> void DepthMap::regularizeDepthMapRow(
             dest->idepth_smoothed = sum;
             dest->idepth_var_smoothed = 1.0f/sumIvar;
 
-            if(enablePrintDebugInfo) stats->num_reg_smeared++;
+            // stats->num_reg_smeared++;
         }
     }
 }
-template void DepthMap::regularizeDepthMapRow<true>(int validityTH, int yMin,
-        int yMax, RunningStats* stats);
-template void DepthMap::regularizeDepthMapRow<false>(int validityTH, int yMin,
-        int yMax, RunningStats* stats);
+template void DepthMap::regularizeDepthMapRow<true>(int validityTH, int yMin, int yMax);
+template void DepthMap::regularizeDepthMapRow<false>(int validityTH, int yMin, int yMax);
 
 
-void DepthMap::regularizeDepthMap(bool removeOcclusions, int validityTH)
-{
-    runningStats.num_reg_smeared=0;
-    runningStats.num_reg_total=0;
-    runningStats.num_reg_deleted_secondary=0;
-    runningStats.num_reg_deleted_occluded=0;
-    runningStats.num_reg_blacklisted=0;
-    runningStats.num_reg_setBlacklisted=0;
-
+void DepthMap::regularizeDepthMap(bool removeOcclusions, int validityTH) {
     memcpy(otherDepthMap,currentDepthMap,
            width*height*sizeof(DepthMapPixelHypothesis));
 
 
     if(removeOcclusions)
-        threadReducer.reduce(boost::bind(&DepthMap::regularizeDepthMapRow<true>, this,
-                                         validityTH, _1, _2, _3), 2, height-2, 10);
+        threadReducer.reduce(boost::bind(&DepthMap::regularizeDepthMapRow<true>,
+                                         this, validityTH, _1, _2),
+                             2, height-2, 10);
     else
-        threadReducer.reduce(boost::bind(&DepthMap::regularizeDepthMapRow<false>, this,
-                                         validityTH, _1, _2, _3), 2, height-2, 10);
-
-
-    if(enablePrintDebugInfo && printRegularizeStatistics)
-        printf("REGULARIZE (%d): %d smeared; %d blacklisted /%d new); %d deleted; %d occluded; %d filled\n",
-               activeKeyFrame->id(),
-               runningStats.num_reg_smeared,
-               runningStats.num_reg_blacklisted,
-               runningStats.num_reg_setBlacklisted,
-               runningStats.num_reg_deleted_secondary,
-               runningStats.num_reg_deleted_occluded,
-               runningStats.num_reg_created);
+        threadReducer.reduce(boost::bind(&DepthMap::regularizeDepthMapRow<false>,
+                                         this, validityTH, _1, _2),
+                             2, height-2, 10);
 }
 
 
@@ -1080,57 +996,6 @@ void DepthMap::initializeFromGTDepth(Frame* new_frame)
     activeKeyFrame->setDepth(currentDepthMap);
 }
 
-void DepthMap::resetCounters()
-{
-    runningStats.num_stereo_comparisons=0;
-    runningStats.num_pixelInterpolations=0;
-    runningStats.num_stereo_calls = 0;
-
-    runningStats.num_stereo_rescale_oob = 0;
-    runningStats.num_stereo_inf_oob = 0;
-    runningStats.num_stereo_near_oob = 0;
-    runningStats.num_stereo_invalid_unclear_winner = 0;
-    runningStats.num_stereo_invalid_atEnd = 0;
-    runningStats.num_stereo_invalid_inexistantCrossing = 0;
-    runningStats.num_stereo_invalid_twoCrossing = 0;
-    runningStats.num_stereo_invalid_noCrossing = 0;
-    runningStats.num_stereo_invalid_bigErr = 0;
-    runningStats.num_stereo_interpPre = 0;
-    runningStats.num_stereo_interpPost = 0;
-    runningStats.num_stereo_interpNone = 0;
-    runningStats.num_stereo_negative = 0;
-    runningStats.num_stereo_successfull = 0;
-
-    runningStats.num_observe_created=0;
-    runningStats.num_observe_create_attempted=0;
-    runningStats.num_observe_updated=0;
-    runningStats.num_observe_update_attempted=0;
-    runningStats.num_observe_skipped_small_epl=0;
-    runningStats.num_observe_skipped_small_epl_grad=0;
-    runningStats.num_observe_skipped_small_epl_angle=0;
-    runningStats.num_observe_transit_finalizing=0;
-    runningStats.num_observe_transit_idle_oob=0;
-    runningStats.num_observe_transit_idle_scale_angle=0;
-    runningStats.num_observe_trans_idle_exhausted=0;
-    runningStats.num_observe_inconsistent_finalizing=0;
-    runningStats.num_observe_inconsistent=0;
-    runningStats.num_observe_notfound_finalizing2=0;
-    runningStats.num_observe_notfound_finalizing=0;
-    runningStats.num_observe_notfound=0;
-    runningStats.num_observe_skip_fail=0;
-    runningStats.num_observe_skip_oob=0;
-    runningStats.num_observe_good=0;
-    runningStats.num_observe_good_finalizing=0;
-    runningStats.num_observe_state_finalizing=0;
-    runningStats.num_observe_state_initializing=0;
-    runningStats.num_observe_skip_alreadyGood=0;
-    runningStats.num_observe_addSkip=0;
-
-
-    runningStats.num_observe_blacklisted=0;
-}
-
-
 
 void DepthMap::updateKeyframe(std::deque< std::shared_ptr<Frame> >
                               referenceFrames)
@@ -1170,8 +1035,6 @@ void DepthMap::updateKeyframe(std::deque< std::shared_ptr<Frame> >
                 frame->id())
             referenceFrameByID.push_back(frame.get());
     }
-
-    resetCounters();
 
 
     if(plotStereoImages)
@@ -1263,47 +1126,6 @@ void DepthMap::updateKeyframe(std::deque< std::shared_ptr<Frame> >
         Util::displayImage( "Stereo Key Frame", debugImageHypothesisHandling, false );
         Util::displayImage( "Stereo Reference Frame", debugImageStereoLines, false );
     }
-
-
-
-    if(enablePrintDebugInfo && printLineStereoStatistics)
-    {
-        printf("ST: calls %6d, comp %6d, int %7d; good %6d (%.0f%%), neg %6d (%.0f%%); interp %6d / %6d / %6d\n",
-               runningStats.num_stereo_calls,
-               runningStats.num_stereo_comparisons,
-               runningStats.num_pixelInterpolations,
-               runningStats.num_stereo_successfull,
-               100*runningStats.num_stereo_successfull / (float)
-               runningStats.num_stereo_calls,
-               runningStats.num_stereo_negative,
-               100*runningStats.num_stereo_negative / (float)
-               runningStats.num_stereo_successfull,
-               runningStats.num_stereo_interpPre,
-               runningStats.num_stereo_interpNone,
-               runningStats.num_stereo_interpPost);
-    }
-    if(enablePrintDebugInfo && printLineStereoFails)
-    {
-        printf("ST-ERR: oob %d (scale %d, inf %d, near %d); err %d (%d uncl; %d end; zro: %d btw, %d no, %d two; %d big)\n",
-               runningStats.num_stereo_rescale_oob+
-               runningStats.num_stereo_inf_oob+
-               runningStats.num_stereo_near_oob,
-               runningStats.num_stereo_rescale_oob,
-               runningStats.num_stereo_inf_oob,
-               runningStats.num_stereo_near_oob,
-               runningStats.num_stereo_invalid_unclear_winner+
-               runningStats.num_stereo_invalid_atEnd+
-               runningStats.num_stereo_invalid_inexistantCrossing+
-               runningStats.num_stereo_invalid_noCrossing+
-               runningStats.num_stereo_invalid_twoCrossing+
-               runningStats.num_stereo_invalid_bigErr,
-               runningStats.num_stereo_invalid_unclear_winner,
-               runningStats.num_stereo_invalid_atEnd,
-               runningStats.num_stereo_invalid_inexistantCrossing,
-               runningStats.num_stereo_invalid_noCrossing,
-               runningStats.num_stereo_invalid_twoCrossing,
-               runningStats.num_stereo_invalid_bigErr);
-    }
 }
 
 void DepthMap::invalidate()
@@ -1326,8 +1148,6 @@ void DepthMap::createKeyFrame(Frame* new_keyframe)
     // gettimeofday(&tv_start_all, NULL);
     tv_start_all = std::chrono::high_resolution_clock::now();
 
-
-    resetCounters();
 
     if(plotStereoImages)
     {
@@ -1599,14 +1419,13 @@ inline float DepthMap::doLineStereo(
     const Eigen::Vector2i &keyframe_coordinate_,
     const float min_idepth, const float prior_idepth, float max_idepth,
     const Frame* const referenceFrame, const float* referenceFrameImage,
-    float &result_idepth, float &result_var, float &result_eplLength,
-    RunningStats* stats) {
+    float &result_idepth, float &result_var, float &result_eplLength) {
     Eigen::Vector2f epipolar_direction;
     bool isGood = makeAndCheckEPL(keyframe_coordinate_, referenceFrame,
-                                  epipolar_direction, stats);
+                                  epipolar_direction);
     if(!isGood) return -5;
 
-    if(enablePrintDebugInfo) stats->num_stereo_calls++;
+    // stats->num_stereo_calls++;
 
     Eigen::Vector2f keyframe_coordinate = keyframe_coordinate_.cast<float>();
 
@@ -1627,7 +1446,7 @@ inline float DepthMap::doLineStereo(
     }
 
     if(!(rescaleFactor > 0.7f && rescaleFactor < 1.4f)) {
-        if(enablePrintDebugInfo) stats->num_stereo_rescale_oob++;
+        // stats->num_stereo_rescale_oob++;
         return -1;
     }
 
@@ -1661,7 +1480,7 @@ inline float DepthMap::doLineStereo(
     // we moved past the Point it and should stop.
     if(_pFar[2] < 0.001 || max_idepth < min_idepth)
     {
-        if(enablePrintDebugInfo) stats->num_stereo_inf_oob++;
+        // stats->num_stereo_inf_oob++;
         return -1;
     }
     // pos in new image of point (xy), assuming min_idepth
@@ -1701,7 +1520,7 @@ inline float DepthMap::doLineStereo(
        pFar[0] >= width-SAMPLE_POINT_TO_BORDER ||
        pFar[1] <= SAMPLE_POINT_TO_BORDER ||
        pFar[1] >= height-SAMPLE_POINT_TO_BORDER) {
-        if(enablePrintDebugInfo) stats->num_stereo_inf_oob++;
+        // stats->num_stereo_inf_oob++;
         return -1;
     }
 
@@ -1735,7 +1554,7 @@ inline float DepthMap::doLineStereo(
            pClose[1] <= SAMPLE_POINT_TO_BORDER ||
            pClose[1] >= height-SAMPLE_POINT_TO_BORDER ||
            newEplLength < 8) {
-            if(enablePrintDebugInfo) stats->num_stereo_near_oob++;
+            // stats->num_stereo_near_oob++;
             return -1;
         }
     }
@@ -1854,21 +1673,21 @@ inline float DepthMap::doLineStereo(
         prev_error_ = error;
         ref_intensities.head(4) = ref_intensities.tail(4);
 
-        if(enablePrintDebugInfo) stats->num_stereo_comparisons++;
+        // stats->num_stereo_comparisons++;
 
         cp += inc;
     }
 
     // if error too big, will return -3, otherwise -2.
     if(min_error > 4*(float)MAX_ERROR_STEREO) {
-        if(enablePrintDebugInfo) stats->num_stereo_invalid_bigErr++;
+        // stats->num_stereo_invalid_bigErr++;
         return -3;
     }
 
     // check if clear enough winner
     if(abs(curr_argmin - second_argmin) > 1 &&
        MIN_DISTANCE_ERROR_STEREO * min_error > second_min_error) {
-        if(enablePrintDebugInfo) stats->num_stereo_invalid_unclear_winner++;
+        // stats->num_stereo_invalid_unclear_winner++;
         return -2;
     }
 
@@ -1886,20 +1705,21 @@ inline float DepthMap::doLineStereo(
 
         // if one is oob: return false.
         if(enablePrintDebugInfo && (prev_error < 0 || next_error < 0)) {
-            stats->num_stereo_invalid_atEnd++;
+            // stats->num_stereo_invalid_atEnd++;
         } else if((grad_next_curr < 0) ^ (grad_prev_curr < 0)) {
             // - if zero-crossing occurs exactly in between (gradient Inconsistent),
             // return exact pos, if both central gradients are small
             // compared to their counterpart.
             if(enablePrintDebugInfo &&
               (grad_next_curr*grad_next_curr > 0.1f*0.1f*grad_next_next*grad_next_next ||
-               grad_prev_curr*grad_prev_curr > 0.1f*0.1f*grad_prev_prev*grad_prev_prev))
-                stats->num_stereo_invalid_inexistantCrossing++;
+               grad_prev_curr*grad_prev_curr > 0.1f*0.1f*grad_prev_prev*grad_prev_prev)) {
+                // stats->num_stereo_invalid_inexistantCrossing++;
+            }
         } else if((grad_prev_prev < 0) ^ (grad_prev_curr < 0)) {
         // if pre has zero-crossing
             // if post has zero-crossing
             if((grad_next_next < 0) ^ (grad_next_curr < 0)) {
-                if(enablePrintDebugInfo) stats->num_stereo_invalid_twoCrossing++;
+                // stats->num_stereo_invalid_twoCrossing++;
             } else {
                 interpolate_prev = true;
             }
@@ -1908,7 +1728,7 @@ inline float DepthMap::doLineStereo(
             interpolate_next = true;
         } else {
             // if none has zero-crossing
-            if(enablePrintDebugInfo) stats->num_stereo_invalid_noCrossing++;
+            // stats->num_stereo_invalid_noCrossing++;
         }
 
         // DO interpolation!
@@ -1919,15 +1739,15 @@ inline float DepthMap::doLineStereo(
             argmin_cp -= d*inc;
             min_error = min_error - 2*d*grad_prev_curr
                        - (grad_prev_prev - grad_prev_curr)*d*d;
-            if(enablePrintDebugInfo) stats->num_stereo_interpPre++;
+            // stats->num_stereo_interpPre++;
         } else if(interpolate_next) {
             float d = grad_next_curr / (grad_next_curr - grad_next_next);
             argmin_cp += d*inc;
             min_error = min_error + 2*d*grad_next_curr
                        + (grad_next_next - grad_next_curr)*d*d;
-            if(enablePrintDebugInfo) stats->num_stereo_interpPost++;
+            // stats->num_stereo_interpPost++;
         } else {
-            if(enablePrintDebugInfo) stats->num_stereo_interpNone++;
+            // stats->num_stereo_interpNone++;
         }
     }
 
@@ -1940,7 +1760,7 @@ inline float DepthMap::doLineStereo(
     // check if interpolated error is OK. use evil hack to allow more error if there is a lot of gradient.
     if(min_error > (float)MAX_ERROR_STEREO + sqrtf(gradAlongLine)*20)
     {
-        if(enablePrintDebugInfo) stats->num_stereo_invalid_bigErr++;
+        // stats->num_stereo_invalid_bigErr++;
         return -3;
     }
 
@@ -1976,12 +1796,12 @@ inline float DepthMap::doLineStereo(
     }
 
     if(idnew_best_match < 0) {
-        if(enablePrintDebugInfo) stats->num_stereo_negative++;
+        // stats->num_stereo_negative++;
         if(!allowNegativeIdepths)
             return -2;
     }
 
-    if(enablePrintDebugInfo) stats->num_stereo_successfull++;
+    // stats->num_stereo_successfull++;
 
     // ================= calc var (in NEW image) ====================
 

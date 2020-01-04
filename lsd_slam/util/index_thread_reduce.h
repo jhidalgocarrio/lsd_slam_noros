@@ -38,12 +38,11 @@ public:
         nextIndex = 0;
         maxIndex = 0;
         stepSize = 1;
-        callPerIndex = boost::bind(&IndexThreadReduce::callPerIndexDefault, this, _1,
-                                   _2, _3);
+        callPerIndex = boost::bind(&IndexThreadReduce::callPerIndexDefault,
+                                   this, _1, _2);
 
         running = true;
-        for(int i=0; i<MAPPING_THREADS; i++)
-        {
+        for(int i=0; i<MAPPING_THREADS; i++) {
             isDone[i] = false;
             workerThreads[i] = boost::thread(&IndexThreadReduce::workerLoop, this, i);
         }
@@ -66,12 +65,12 @@ public:
 
     }
 
-    inline void reduce(boost::function<void(int,int,RunningStats*)> callPerIndex,
+    inline void reduce(boost::function<void(int,int)> callPerIndex,
                        int first, int end, int stepSize = 0)
     {
         if(!multiThreading)
         {
-            callPerIndex(first, end, &runningStats);
+            callPerIndex(first, end);
             return;
         }
 
@@ -119,8 +118,8 @@ public:
 
         nextIndex = 0;
         maxIndex = 0;
-        this->callPerIndex = boost::bind(&IndexThreadReduce::callPerIndexDefault, this,
-                                         _1, _2, _3);
+        this->callPerIndex = boost::bind(&IndexThreadReduce::callPerIndexDefault,
+                                         this, _1, _2);
 
         //printf("reduce done (all threads finished)\n");
     }
@@ -140,9 +139,9 @@ private:
 
     bool running;
 
-    boost::function<void(int,int,RunningStats*)> callPerIndex;
+    boost::function<void(int,int)> callPerIndex;
 
-    void callPerIndexDefault(int i, int j,RunningStats* k)
+    void callPerIndexDefault(int i, int j)
     {
         printf("ERROR: should never be called....\n");
     }
@@ -171,11 +170,9 @@ private:
 
                 assert(callPerIndex != 0);
 
-                RunningStats s;
-                callPerIndex(todo, std::min(todo+stepSize, maxIndex), &s);
+                callPerIndex(todo, std::min(todo+stepSize, maxIndex));
 
                 lock.lock();
-                runningStats.add(&s);
             }
 
             // otherwise wait on signal, releasing lock in the meantime.

@@ -487,20 +487,6 @@ void SlamSystem::createNewCurrentKeyframe(std::shared_ptr<Frame>
     // propagate & make new.
     map->createKeyFrame(newKeyframeCandidate.get());
 
-    if(printPropagationStatistics)
-    {
-
-        Eigen::Matrix<float, 20, 1> data;
-        data.setZero();
-        data[0] = runningStats.num_prop_attempts / ((float)width*height);
-        data[1] = (runningStats.num_prop_created + runningStats.num_prop_merged) /
-                  (float)runningStats.num_prop_attempts;
-        data[2] = runningStats.num_prop_removed_colorDiff / (float)
-                  runningStats.num_prop_attempts;
-
-        outputWrapper->publishDebugInfo(data);
-    }
-
     currentKeyFrameMutex.lock();
     currentKeyFrame = newKeyframeCandidate;
     currentKeyFrameMutex.unlock();
@@ -602,33 +588,6 @@ bool SlamSystem::updateKeyframe()
         unmappedTrackedFramesMutex.unlock();
         return false;
     }
-
-
-    if(enablePrintDebugInfo && printRegularizeStatistics)
-    {
-        Eigen::Matrix<float, 20, 1> data;
-        data.setZero();
-        data[0] = runningStats.num_reg_created;
-        data[2] = runningStats.num_reg_smeared;
-        data[3] = runningStats.num_reg_deleted_secondary;
-        data[4] = runningStats.num_reg_deleted_occluded;
-        data[5] = runningStats.num_reg_blacklisted;
-
-        data[6] = runningStats.num_observe_created;
-        data[7] = runningStats.num_observe_create_attempted;
-        data[8] = runningStats.num_observe_updated;
-        data[9] = runningStats.num_observe_update_attempted;
-
-
-        data[10] = runningStats.num_observe_good;
-        data[11] = runningStats.num_observe_inconsistent;
-        data[12] = runningStats.num_observe_notfound;
-        data[13] = runningStats.num_observe_skip_oob;
-        data[14] = runningStats.num_observe_skip_fail;
-
-        outputWrapper->publishDebugInfo(data);
-    }
-
 
 
     if(outputWrapper != 0 && continuousPCOutput && currentKeyFrame != 0)

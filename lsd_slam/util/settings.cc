@@ -26,8 +26,6 @@
 
 namespace lsd_slam
 {
-RunningStats runningStats;
-
 
 bool autoRun = true;
 bool autoRunWithinFrame = true;
