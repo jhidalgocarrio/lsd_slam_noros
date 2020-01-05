@@ -1431,6 +1431,8 @@ inline float DepthMap::doLineStereo(
     const float min_idepth, const float prior_idepth, float max_idepth,
     const Frame* const referenceFrame, const float* referenceFrameImage,
     float &result_idepth, float &result_var, float &result_eplLength) {
+    const Eigen::Vector2i image_size(width, height);
+
     Eigen::Vector2f epipolar_direction;
     bool isGood = makeAndCheckEPL(keyframe_coordinate_, referenceFrame,
                                   epipolar_direction);
@@ -1449,10 +1451,9 @@ inline float DepthMap::doLineStereo(
 
     const Eigen::Vector2f first = keyframe_coordinate - 2*epipolar_direction*rescaleFactor;
     const Eigen::Vector2f last = keyframe_coordinate + 2*epipolar_direction*rescaleFactor;
-    const Eigen::Vector2i image_size(width, height);
     // 2 comes from the one-sided gradient calculation at the bottom
-    if (not (is_in_image_range(first, image_size, 2) &&
-             is_in_image_range(last, image_size, 2))) {
+    if ((not is_in_image_range(first, image_size, 2)) ||
+        (not is_in_image_range(last, image_size, 2))) {
         return -1;
     }
 
@@ -1526,48 +1527,11 @@ inline float DepthMap::doLineStereo(
         pClose += inc*pad;
     }
 
-    // if inf point is outside of image: skip pixel.
-    if(pFar[0] <= SAMPLE_POINT_TO_BORDER ||
-       pFar[0] >= width-SAMPLE_POINT_TO_BORDER ||
-       pFar[1] <= SAMPLE_POINT_TO_BORDER ||
-       pFar[1] >= height-SAMPLE_POINT_TO_BORDER) {
+    if((not is_in_image_range(pFar, image_size, SAMPLE_POINT_TO_BORDER+1)) ||
+       (not is_in_image_range(pClose, image_size, SAMPLE_POINT_TO_BORDER+1))) {
         // stats->num_stereo_inf_oob++;
+        // stats->num_stereo_near_oob++;
         return -1;
-    }
-
-    // if near point is outside: move inside, and test length again.
-    if(pClose[0] <= SAMPLE_POINT_TO_BORDER ||
-       pClose[0] >= width-SAMPLE_POINT_TO_BORDER ||
-       pClose[1] <= SAMPLE_POINT_TO_BORDER ||
-       pClose[1] >= height-SAMPLE_POINT_TO_BORDER) {
-        if(pClose[0] <= SAMPLE_POINT_TO_BORDER) {
-            float toAdd = (SAMPLE_POINT_TO_BORDER - pClose[0]) / inc[0];
-            pClose += toAdd * inc;
-        } else if(pClose[0] >= width-SAMPLE_POINT_TO_BORDER) {
-            float toAdd = (width-SAMPLE_POINT_TO_BORDER - pClose[0]) / inc[0];
-            pClose += toAdd * inc;
-        }
-
-        if(pClose[1] <= SAMPLE_POINT_TO_BORDER) {
-            float toAdd = (SAMPLE_POINT_TO_BORDER - pClose[1]) / inc[1];
-            pClose += toAdd * inc;
-        } else if(pClose[1] >= height-SAMPLE_POINT_TO_BORDER) {
-            float toAdd = (height-SAMPLE_POINT_TO_BORDER - pClose[1]) / inc[1];
-            pClose += toAdd * inc;
-        }
-
-        // get new epl length
-        float newEplLength = (pClose - pFar).norm();
-
-        // test again
-        if(pClose[0] <= SAMPLE_POINT_TO_BORDER ||
-           pClose[0] >= width-SAMPLE_POINT_TO_BORDER ||
-           pClose[1] <= SAMPLE_POINT_TO_BORDER ||
-           pClose[1] >= height-SAMPLE_POINT_TO_BORDER ||
-           newEplLength < 8) {
-            // stats->num_stereo_near_oob++;
-            return -1;
-        }
     }
 
     // from here on:
