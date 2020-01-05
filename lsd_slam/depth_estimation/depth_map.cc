@@ -35,6 +35,7 @@
 #include "io_wrapper/image_display.h"
 #include "global_mapping/key_frame_graph.h"
 #include "projection.h"
+#include "math.h"
 
 
 namespace lsd_slam {
@@ -164,13 +165,25 @@ void DepthMap::observeDepth()
 }
 
 
+Eigen::Vector2f compute_image_gradient(const float* image,
+                                       const int image_width,
+                                       const Eigen::Vector2i &coordinate) {
+    int x = coordinate[0];
+    int y = coordinate[1];
+
+    int idx = x+y*image_width;
+
+    // ===== check epl-grad magnitude ======
+    const float gx = image[idx+1] - image[idx-1];
+    const float gy = image[idx+image_width] - image[idx-image_width];
+    const Eigen::Vector2f grad(gx, gy);
+    return grad;
+}
+
+
 bool DepthMap::makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
                                const Frame* const ref,
                                Eigen::Vector2f &pep) {
-    const int x = keyframe_coordinate[0];
-    const int y = keyframe_coordinate[1];
-
-    int idx = x+y*width;
 
     // ======= make epl ========
     // calculate the plane spanned by the two camera centers and the point (x,y,1)
@@ -182,37 +195,33 @@ bool DepthMap::makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
     );
 
     // ======== check epl length =========
-    const float eplLengthSquared = epipolar_line.squaredNorm();
+    const float epipolar_length_squared = epipolar_line.squaredNorm();
 
-    if(eplLengthSquared < MIN_EPL_LENGTH_SQUARED) {
+    if(epipolar_length_squared < MIN_EPL_LENGTH_SQUARED) {
         // stats->num_observe_skipped_small_epl++;
         return false;
     }
+    const Eigen::Vector2f &grad = compute_image_gradient(
+        activeKeyFrameImageData, width, keyframe_coordinate);
 
-    // ===== check epl-grad magnitude ======
-    const float gx = activeKeyFrameImageData[idx+1]
-                   - activeKeyFrameImageData[idx-1];
-    const float gy = activeKeyFrameImageData[idx+width]
-                   - activeKeyFrameImageData[idx-width];
-    const Eigen::Vector2f grad(gx, gy);
-    float eplGradSquared = grad.dot(epipolar_line);
+    const float grad_projected = grad.dot(epipolar_line);
     // square and norm with epl-length
-    eplGradSquared = eplGradSquared*eplGradSquared / eplLengthSquared;
+    const float eplGradSquared = grad_projected * grad_projected / epipolar_length_squared;
 
+    // FIXME is this condition really necessary?
     if(eplGradSquared < MIN_EPL_GRAD_SQUARED) {
         // stats->num_observe_skipped_small_epl_grad++;
         return false;
     }
 
     // ===== check epl-grad angle ======
-    if(eplGradSquared / grad.squaredNorm() < MIN_EPL_ANGLE_SQUARED) {
+    if(cosine_angle_squared(epipolar_line, grad) < MIN_EPL_ANGLE_SQUARED) {
         // stats->num_observe_skipped_small_epl_angle++;
         return false;
     }
 
-
     // ===== DONE - return "normalized" epl =====
-    float fac = GRADIENT_SAMPLE_DIST / sqrt(eplLengthSquared);
+    float fac = GRADIENT_SAMPLE_DIST / sqrt(epipolar_length_squared);
     pep = epipolar_line * fac;
 
     return true;
@@ -288,14 +297,13 @@ bool DepthMap::observeDepthUpdate(const Eigen::Vector2i &keyframe_coordinate,
 
     const int x = keyframe_coordinate[0];
     const int y = keyframe_coordinate[1];
-    if(!activeKeyFrameIsReactivated)
-    {
+    if(!activeKeyFrameIsReactivated) {
         if((int)target->nextStereoFrameMinID - referenceFrameByID_offset >=
-                (int)referenceFrameByID.size())
-        {
-            if(plotStereoImages)
+                (int)referenceFrameByID.size()) {
+            if(plotStereoImages) {
                 // GREEN FOR skip
                 debugImageHypothesisHandling.at<cv::Vec3b>(y, x) = cv::Vec3b(0,255, 0);
+            }
 
             // stats->num_observe_skip_alreadyGood++;
             return false;
