@@ -1492,24 +1492,24 @@ inline float DepthMap::doLineStereo(
         return -1;
     }
     // pos in new image of point (xy), assuming min_idepth
-    Eigen::Vector2f pFar = _pFar.head(2) / _pFar[2];
+    Eigen::Vector2f pFar = projection(_pFar);
 
 
     // check for nan due to eg division by zero.
-    if(std::isnan((float)(pFar[0] + pClose[0])))
-        return -4;
+    // if(std::isnan((float)(pFar[0] + pClose[0])))
+    //     return -4;
 
     // calculate increments in which we will step through the epipolar line.
     // they are sampleDist (or half sample dist) long
-    Eigen::Vector2f inc = pClose - pFar;
-    float eplLength = inc.norm();
+    Eigen::Vector2f inc = normalize_length(pClose - pFar);
+    float eplLength = (pClose - pFar).norm();
     if(!eplLength > 0 || std::isinf(eplLength)) return -4;
 
     if(eplLength > MAX_EPL_LENGTH_CROP) {
-        pClose = pFar + inc * MAX_EPL_LENGTH_CROP / eplLength;
+        pClose = pFar + inc * MAX_EPL_LENGTH_CROP;
     }
 
-    inc *= GRADIENT_SAMPLE_DIST/eplLength;
+    inc = inc * GRADIENT_SAMPLE_DIST;
 
     // extend one sample_dist to left & right.
     pFar -= inc;
