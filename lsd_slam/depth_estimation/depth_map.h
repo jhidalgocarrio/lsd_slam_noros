@@ -29,11 +29,14 @@
 #include "util/index_thread_reduce.h"
 #include "util/sophus_util.h"
 
+float calc_grad_along_line(const Eigen::VectorXf &intensities,
+                           const float interval);
+bool is_in_image_range(const Eigen::Vector2f &keypoint,
+                       const Eigen::Vector2i &image_size,
+                       const int padding = 0);
 
 namespace lsd_slam
 {
-
-float calc_grad_along_line(Eigen::VectorXf &intensities, float interval);
 
 typedef std::chrono::high_resolution_clock::time_point timepoint_t;
 

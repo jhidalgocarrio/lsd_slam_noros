@@ -38,8 +38,8 @@
 #include "math.h"
 
 
-namespace lsd_slam {
-float calc_grad_along_line(Eigen::VectorXf &intensities, float interval) {
+float calc_grad_along_line(const Eigen::VectorXf &intensities,
+                           const float interval) {
     float grad_along_line = 0;
     for (int i = 0; i < intensities.size() - 1; i++) {
         float d = intensities[i+1] - intensities[i];
@@ -49,6 +49,17 @@ float calc_grad_along_line(Eigen::VectorXf &intensities, float interval) {
     return grad_along_line / (interval * interval);
 }
 
+bool is_in_image_range(const Eigen::Vector2f &keypoint,
+                       const Eigen::Vector2i &image_size,
+                       const int padding) {
+    return (padding <= keypoint[0] &&
+            padding <= keypoint[1] &&
+            keypoint[0] <= image_size[0] - 1 - padding &&
+            keypoint[1] <= image_size[1] - 1 - padding);
+}
+
+
+namespace lsd_slam {
 
 DepthMap::DepthMap(int w, int h, const Eigen::Matrix3f& K)
 {
@@ -1406,14 +1417,6 @@ int DepthMap::debugPlotDepthMap()
     return 1;
 }
 
-bool is_in_image_range(const Eigen::Vector2f &keypoint,
-                       const Eigen::Vector2i image_size) {
-    return (0 < keypoint[0] && keypoint[0] < image_size[0] - 2 &&
-            0 < keypoint[1] && keypoint[1] < image_size[1] - 2);
-}
-
-
-
 // find pixel in image (do stereo along epipolar line).
 // mat: NEW image
 // KinvP: point in OLD image (Kinv * (u_old, v_old, 1)), projected
@@ -1447,9 +1450,9 @@ inline float DepthMap::doLineStereo(
     const Eigen::Vector2f first = keyframe_coordinate - 2*epipolar_direction*rescaleFactor;
     const Eigen::Vector2f last = keyframe_coordinate + 2*epipolar_direction*rescaleFactor;
     const Eigen::Vector2i image_size(width, height);
-    // width - 2 and height - 2 comes from the one-sided gradient calculation at the bottom
-    if (not (is_in_image_range(first, image_size) &&
-             is_in_image_range(last, image_size))) {
+    // 2 comes from the one-sided gradient calculation at the bottom
+    if (not (is_in_image_range(first, image_size, 2) &&
+             is_in_image_range(last, image_size, 2))) {
         return -1;
     }
 
