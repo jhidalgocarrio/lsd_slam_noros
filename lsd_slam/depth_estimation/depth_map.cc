@@ -193,7 +193,7 @@ Eigen::Vector2f compute_image_gradient(const float* image,
 
 
 bool DepthMap::makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
-                               const Frame* const ref,
+                               const Eigen::Vector3f &thisToOther_t,
                                Eigen::Vector2f &pep) {
 
     // ======= make epl ========
@@ -201,8 +201,8 @@ bool DepthMap::makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
     // intersect it with the keyframe's image plane (at depth=1)
     const Eigen::Matrix3f &K = create_intrinsic_matrix(fx, fy, cx, cy);
 
-    const Eigen::Vector2f epipolar_line = ref->thisToOther_t[2] * (
-        keyframe_coordinate.cast<float>() - perspective_projection(ref->thisToOther_t, K)
+    const Eigen::Vector2f epipolar_line = thisToOther_t[2] * (
+        keyframe_coordinate.cast<float>() - perspective_projection(thisToOther_t, K)
     );
 
     // ======== check epl length =========
@@ -1434,7 +1434,8 @@ inline float DepthMap::doLineStereo(
     const Eigen::Vector2i image_size(width, height);
 
     Eigen::Vector2f epipolar_direction;
-    bool isGood = makeAndCheckEPL(keyframe_coordinate_, referenceFrame,
+    bool isGood = makeAndCheckEPL(keyframe_coordinate_,
+                                  referenceFrame->thisToOther_t,
                                   epipolar_direction);
     if(!isGood) return -5;
 

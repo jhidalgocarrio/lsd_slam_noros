@@ -157,7 +157,7 @@ private:
                             const float* keyFrameMaxGradBuf);
 
     bool makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
-                         const Frame* const ref,
+                         const Eigen::Vector3f &thisToOther_t,
                          Eigen::Vector2f &pep);
 
     void regularizeDepthMap(bool removeOcclusion, int validityTH);
