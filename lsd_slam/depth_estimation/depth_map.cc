@@ -1417,6 +1417,15 @@ int DepthMap::debugPlotDepthMap()
     return 1;
 }
 
+
+bool search_range_is_in_image_area(const Eigen::Vector2f &start,
+                                   const Eigen::Vector2f &end,
+                                   const Eigen::Vector2i &image_size) {
+    // 2 comes from the one-sided gradient calculation at the bottom
+    return is_in_image_range(start, image_size, 2) &&
+           is_in_image_range(end, image_size, 2);
+}
+
 // find pixel in image (do stereo along epipolar line).
 // mat: NEW image
 // KinvP: point in OLD image (Kinv * (u_old, v_old, 1)), projected
@@ -1444,19 +1453,19 @@ inline float DepthMap::doLineStereo(
     const Eigen::Vector2f keyframe_coordinate = keyframe_coordinate_.cast<float>();
 
     // calculate epipolar line start and end point in old image
-    Eigen::Vector3f KinvP = KInv * tohomogeneous(keyframe_coordinate);
-    Eigen::Vector3f pInf = referenceFrame->K_otherToThis_R * KinvP;
-    Eigen::Vector3f pReal = pInf / prior_idepth + referenceFrame->K_otherToThis_t;
+    const Eigen::Vector3f KinvP = KInv * tohomogeneous(keyframe_coordinate);
+    const Eigen::Vector3f pReal = referenceFrame->K_otherToThis_R * KinvP / prior_idepth
+                                + referenceFrame->K_otherToThis_t;
 
     const float rescaleFactor = pReal[2] * prior_idepth;
 
-    const Eigen::Vector2f first = keyframe_coordinate - 2*epipolar_direction*rescaleFactor;
-    const Eigen::Vector2f last = keyframe_coordinate + 2*epipolar_direction*rescaleFactor;
-    // 2 comes from the one-sided gradient calculation at the bottom
-    if ((not is_in_image_range(first, image_size, 2)) ||
-        (not is_in_image_range(last, image_size, 2))) {
+    if (not search_range_is_in_image_area(
+            keyframe_coordinate - 2*epipolar_direction*rescaleFactor,
+            keyframe_coordinate + 2*epipolar_direction*rescaleFactor,
+            image_size)) {
         return -1;
     }
+
 
     if(!(rescaleFactor > 0.7f && rescaleFactor < 1.4f)) {
         // stats->num_stereo_rescale_oob++;
@@ -1465,17 +1474,20 @@ inline float DepthMap::doLineStereo(
 
   //	if(referenceFrame->K_otherToThis_t[2] * max_idepth + pInf[2] < 0.01)
 
-    Eigen::Vector3f _pClose = pInf + referenceFrame->K_otherToThis_t*max_idepth;
+    Eigen::Vector3f _pClose = referenceFrame->K_otherToThis_R * KinvP
+                            + referenceFrame->K_otherToThis_t*max_idepth;
     // if the assumed close-point lies behind the
     // image, have to change that.
     if(_pClose[2] < 0.001) {
+        const Eigen::Vector3f pInf = referenceFrame->K_otherToThis_R * KinvP;
         max_idepth = (0.001-pInf[2]) / referenceFrame->K_otherToThis_t[2];
         _pClose = pInf + referenceFrame->K_otherToThis_t*max_idepth;
     }
     // pos in new image of point (xy), assuming max_idepth
     Eigen::Vector2f pClose = projection(_pClose);
 
-    Eigen::Vector3f _pFar = pInf + referenceFrame->K_otherToThis_t*min_idepth;
+    Eigen::Vector3f _pFar = referenceFrame->K_otherToThis_R * KinvP
+                          + referenceFrame->K_otherToThis_t * min_idepth;
     // if the assumed far-point lies behind the image or closter than the near-point,
     // we moved past the Point it and should stop.
     if(_pFar[2] < 0.001 || max_idepth < min_idepth)
