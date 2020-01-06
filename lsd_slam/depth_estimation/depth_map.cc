@@ -1426,6 +1426,20 @@ bool search_range_is_in_image_area(const Eigen::Vector2f &start,
            is_in_image_range(end, image_size, 2);
 }
 
+
+Eigen::VectorXf intensities_along_line(const float *image, const int image_width,
+                                       const Eigen::Vector2f &center_coordinate,
+                                       const Eigen::Vector2f &step) {
+    // calculate values to search for
+    Eigen::VectorXf intensities(5);
+    intensities[0] = getInterpolatedElement(image, center_coordinate - 2 * step, image_width);
+    intensities[1] = getInterpolatedElement(image, center_coordinate - 1 * step, image_width);
+    intensities[2] = getInterpolatedElement(image, center_coordinate - 0 * step, image_width);
+    intensities[3] = getInterpolatedElement(image, center_coordinate + 1 * step, image_width);
+    intensities[4] = getInterpolatedElement(image, center_coordinate + 2 * step, image_width);
+    return intensities;
+}
+
 // find pixel in image (do stereo along epipolar line).
 // mat: NEW image
 // KinvP: point in OLD image (Kinv * (u_old, v_old, 1)), projected
@@ -1560,18 +1574,10 @@ inline float DepthMap::doLineStereo(
      *    where i is the respective winning index.
      */
 
-    // calculate values to search for
-    Eigen::VectorXf key_intensities(5);
-    key_intensities[0] = getInterpolatedElement(activeKeyFrameImageData,
-                keyframe_coordinate - 2 * epipolar_direction * rescaleFactor, width);
-    key_intensities[1] = getInterpolatedElement(activeKeyFrameImageData,
-                keyframe_coordinate - 1 * epipolar_direction * rescaleFactor, width);
-    key_intensities[2] = getInterpolatedElement(activeKeyFrameImageData,
-                keyframe_coordinate - 0 * epipolar_direction * rescaleFactor, width);
-    key_intensities[3] = getInterpolatedElement(activeKeyFrameImageData,
-                keyframe_coordinate + 1 * epipolar_direction * rescaleFactor, width);
-    key_intensities[4] = getInterpolatedElement(activeKeyFrameImageData,
-                keyframe_coordinate + 2 * epipolar_direction * rescaleFactor, width);
+    const Eigen::VectorXf &key_intensities = intensities_along_line(
+        activeKeyFrameImageData, width,
+        keyframe_coordinate, epipolar_direction * rescaleFactor
+    );
 
     Eigen::VectorXf ref_intensities(5);
     ref_intensities[0] = getInterpolatedElement(referenceFrameImage,
