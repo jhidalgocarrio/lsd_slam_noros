@@ -1440,14 +1440,14 @@ inline float DepthMap::doLineStereo(
 
     // stats->num_stereo_calls++;
 
-    Eigen::Vector2f keyframe_coordinate = keyframe_coordinate_.cast<float>();
+    const Eigen::Vector2f keyframe_coordinate = keyframe_coordinate_.cast<float>();
 
     // calculate epipolar line start and end point in old image
     Eigen::Vector3f KinvP = KInv * tohomogeneous(keyframe_coordinate);
     Eigen::Vector3f pInf = referenceFrame->K_otherToThis_R * KinvP;
     Eigen::Vector3f pReal = pInf / prior_idepth + referenceFrame->K_otherToThis_t;
 
-    float rescaleFactor = pReal[2] * prior_idepth;
+    const float rescaleFactor = pReal[2] * prior_idepth;
 
     const Eigen::Vector2f first = keyframe_coordinate - 2*epipolar_direction*rescaleFactor;
     const Eigen::Vector2f last = keyframe_coordinate + 2*epipolar_direction*rescaleFactor;
@@ -1462,20 +1462,7 @@ inline float DepthMap::doLineStereo(
         return -1;
     }
 
-    // calculate values to search for
-    Eigen::VectorXf key_intensities(5);
-    key_intensities[0] = getInterpolatedElement(activeKeyFrameImageData,
-                keyframe_coordinate - 2 * epipolar_direction * rescaleFactor, width);
-    key_intensities[1] = getInterpolatedElement(activeKeyFrameImageData,
-                keyframe_coordinate - 1 * epipolar_direction * rescaleFactor, width);
-    key_intensities[2] = getInterpolatedElement(activeKeyFrameImageData,
-                keyframe_coordinate, width);
-    key_intensities[3] = getInterpolatedElement(activeKeyFrameImageData,
-                keyframe_coordinate + 1 * epipolar_direction * rescaleFactor, width);
-    key_intensities[4] = getInterpolatedElement(activeKeyFrameImageData,
-                keyframe_coordinate + 2 * epipolar_direction * rescaleFactor, width);
-
-//	if(referenceFrame->K_otherToThis_t[2] * max_idepth + pInf[2] < 0.01)
+  //	if(referenceFrame->K_otherToThis_t[2] * max_idepth + pInf[2] < 0.01)
 
     Eigen::Vector3f _pClose = pInf + referenceFrame->K_otherToThis_t*max_idepth;
     // if the assumed close-point lies behind the
@@ -1541,19 +1528,6 @@ inline float DepthMap::doLineStereo(
     // - eplLength, min_idepth, max_idepth:
     // determines search-resolution, i.e. the result's variance.
 
-    Eigen::Vector2f cp = pFar;
-
-    Eigen::VectorXf ref_intensities(5);
-    ref_intensities[0] = getInterpolatedElement(referenceFrameImage,
-                                        pFar.head(2) - 2 * inc, width);
-    ref_intensities[1] = getInterpolatedElement(referenceFrameImage,
-                                        pFar.head(2) - 1 * inc, width);
-    ref_intensities[2] = getInterpolatedElement(referenceFrameImage,
-                                        pFar.head(2) - 0 * inc, width);
-    ref_intensities[3] = getInterpolatedElement(referenceFrameImage,
-                                        pFar.head(2) + 1 * inc, width);
-
-
     /*
      * Subsequent exact minimum is found the following way:
      * - assuming lin. interpolation, the gradient of Error at p1 (towards p2) is given by
@@ -1572,6 +1546,31 @@ inline float DepthMap::doLineStereo(
      *    and sum(e_i * e_{i-1}) and sum(e_i * e_{i+1}),
      *    where i is the respective winning index.
      */
+
+    // calculate values to search for
+    Eigen::VectorXf key_intensities(5);
+    key_intensities[0] = getInterpolatedElement(activeKeyFrameImageData,
+                keyframe_coordinate - 2 * epipolar_direction * rescaleFactor, width);
+    key_intensities[1] = getInterpolatedElement(activeKeyFrameImageData,
+                keyframe_coordinate - 1 * epipolar_direction * rescaleFactor, width);
+    key_intensities[2] = getInterpolatedElement(activeKeyFrameImageData,
+                keyframe_coordinate - 0 * epipolar_direction * rescaleFactor, width);
+    key_intensities[3] = getInterpolatedElement(activeKeyFrameImageData,
+                keyframe_coordinate + 1 * epipolar_direction * rescaleFactor, width);
+    key_intensities[4] = getInterpolatedElement(activeKeyFrameImageData,
+                keyframe_coordinate + 2 * epipolar_direction * rescaleFactor, width);
+
+    Eigen::VectorXf ref_intensities(5);
+    ref_intensities[0] = getInterpolatedElement(referenceFrameImage,
+                                                pFar - 2 * inc, width);
+    ref_intensities[1] = getInterpolatedElement(referenceFrameImage,
+                                                pFar - 1 * inc, width);
+    ref_intensities[2] = getInterpolatedElement(referenceFrameImage,
+                                                pFar - 0 * inc, width);
+    ref_intensities[3] = getInterpolatedElement(referenceFrameImage,
+                                                pFar + 1 * inc, width);
+
+    Eigen::Vector2f cp = pFar;
 
     // walk in equally sized steps, starting at depth=infinity.
     Eigen::Vector2f argmin_cp(-1, -1);
