@@ -1517,15 +1517,14 @@ inline float DepthMap::doLineStereo(
 
     // calculate increments in which we will step through the epipolar line.
     // they are sampleDist (or half sample dist) long
-    Eigen::Vector2f search_step = normalize_length(pClose - pFar);
+    const Eigen::Vector2f search_step =
+        GRADIENT_SAMPLE_DIST * normalize_length(pClose - pFar);
     float eplLength = (pClose - pFar).norm();
     if(!eplLength > 0 || std::isinf(eplLength)) return -4;
 
     if(eplLength > MAX_EPL_LENGTH_CROP) {
-        pClose = pFar + search_step * MAX_EPL_LENGTH_CROP;
+        pClose = pFar + normalize_length(pClose - pFar) * MAX_EPL_LENGTH_CROP;
     }
-
-    search_step = search_step * GRADIENT_SAMPLE_DIST;
 
     // extend one sample_dist to left & right.
     pFar -= search_step;
