@@ -61,6 +61,20 @@ bool is_in_image_range(const Eigen::Vector2f &keypoint,
 
 namespace lsd_slam {
 
+float calc_geometric_disparity_error(
+    const Eigen::Vector2f &interpolated_gradient,
+    const Eigen::Vector2f &epipolar_direction,
+    const float initialTrackedResidual) {
+    // calculate error from photometric noise
+    float trackingErrorFac = 0.25 * (1+initialTrackedResidual);
+
+    // calculate error from geometric noise (wrong camera pose / calibration)
+    const float p = epipolar_direction.dot(interpolated_gradient) + DIVISION_EPS;
+    const float n = interpolated_gradient.squaredNorm();
+    return trackingErrorFac * trackingErrorFac * n  / (p * p);
+}
+
+
 DepthMap::DepthMap(int w, int h, const Eigen::Matrix3f& K)
 {
     width = w;
@@ -1795,17 +1809,14 @@ inline float DepthMap::doLineStereo(
 
     // ================= calc var (in NEW image) ====================
 
-    // calculate error from photometric noise
-    float trackingErrorFac = 0.25 * (1+referenceFrame->initialTrackedResidual);
+    const float geoDispError = calc_geometric_disparity_error(
+        getInterpolatedElement42(activeKeyFrame->gradients(0),
+                                 keyframe_coordinate, width),
+        epipolar_direction,
+        referenceFrame->initialTrackedResidual
+    );
 
-    // calculate error from geometric noise (wrong camera pose / calibration)
-    const Eigen::Vector2f gradsInterp = getInterpolatedElement42(
-        activeKeyFrame->gradients(0), keyframe_coordinate, width);
-    float geoDispError = epipolar_direction.dot(gradsInterp) + DIVISION_EPS;
-    geoDispError = trackingErrorFac*trackingErrorFac*gradsInterp.squaredNorm()
-                 / (geoDispError*geoDispError);
-
-    //geoDispError *= (0.5 + 0.5 *result_idepth) * (0.5 + 0.5 *result_idepth);
+    // geoDispError *= (0.5 + 0.5 *result_idepth) * (0.5 + 0.5 *result_idepth);
 
     // final error consists of a small constant part (discretization error),
     // geometric and photometric error.
