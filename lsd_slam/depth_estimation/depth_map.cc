@@ -1755,7 +1755,7 @@ inline float DepthMap::doLineStereo(
 
 
     // sampleDist is the distance in pixel at which the key_intensities[2]'s were sampled
-    float sampleDist = GRADIENT_SAMPLE_DIST*rescaleFactor;
+    const float sampleDist = GRADIENT_SAMPLE_DIST*rescaleFactor;
 
     const float gradAlongLine = calc_grad_along_line(key_intensities, sampleDist);
 
