@@ -1743,7 +1743,7 @@ inline float DepthMap::doLineStereo(
     // sampleDist is the distance in pixel at which the key_intensities[2]'s were sampled
     float sampleDist = GRADIENT_SAMPLE_DIST*rescaleFactor;
 
-    float gradAlongLine = calc_grad_along_line(key_intensities, sampleDist);
+    const float gradAlongLine = calc_grad_along_line(key_intensities, sampleDist);
 
     // check if interpolated error is OK. use evil hack to allow more error if there is a lot of gradient.
     if(min_error > (float)MAX_ERROR_STEREO + sqrtf(gradAlongLine)*20) {
@@ -1764,9 +1764,10 @@ inline float DepthMap::doLineStereo(
 
     const Eigen::Vector3f inv_cp = KInv * tohomogeneous(argmin_point_ref);
 
-    Eigen::Vector2f nominators = (inv_cp.head(2)*referenceFrame->otherToThis_t[2] -
-                                  referenceFrame->otherToThis_t.head(2));
-    Eigen::Vector2f idnew_best_matches =
+    const Eigen::Vector2f nominators =
+        inv_cp.head(2)*referenceFrame->otherToThis_t[2] -
+        referenceFrame->otherToThis_t.head(2);
+    const Eigen::Vector2f idnew_best_matches =
         (RKinvP.head(2) - inv_cp.head(2)*RKinvP[2]).array() /
         nominators.array();
 
@@ -1795,15 +1796,12 @@ inline float DepthMap::doLineStereo(
     // ================= calc var (in NEW image) ====================
 
     // calculate error from photometric noise
-    float photoDispError = 4 * cameraPixelNoise2 / (gradAlongLine + DIVISION_EPS);
-
-    float trackingErrorFac = 0.25*(1+referenceFrame->initialTrackedResidual);
+    float trackingErrorFac = 0.25 * (1+referenceFrame->initialTrackedResidual);
 
     // calculate error from geometric noise (wrong camera pose / calibration)
-    Eigen::Vector2f gradsInterp = getInterpolatedElement42(
+    const Eigen::Vector2f gradsInterp = getInterpolatedElement42(
         activeKeyFrame->gradients(0), keyframe_coordinate, width);
-    float geoDispError = epipolar_direction.dot(gradsInterp)
-                       + DIVISION_EPS;
+    float geoDispError = epipolar_direction.dot(gradsInterp) + DIVISION_EPS;
     geoDispError = trackingErrorFac*trackingErrorFac*gradsInterp.squaredNorm()
                  / (geoDispError*geoDispError);
 
@@ -1812,6 +1810,7 @@ inline float DepthMap::doLineStereo(
     // final error consists of a small constant part (discretization error),
     // geometric and photometric error.
     float coeff = (interpolate_prev || interpolate_next) ? 0.05f : 0.5f;
+    const float photoDispError = 4 * cameraPixelNoise2 / (gradAlongLine + DIVISION_EPS);
     result_var = alpha*alpha*(coeff*sampleDist*sampleDist +
                               geoDispError + photoDispError);	// square to make variance
 
