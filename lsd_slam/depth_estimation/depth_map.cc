@@ -71,7 +71,7 @@ float calc_geometric_disparity_error(
     // calculate error from geometric noise (wrong camera pose / calibration)
     const float p = epipolar_direction.dot(interpolated_gradient) + DIVISION_EPS;
     const float n = interpolated_gradient.squaredNorm();
-    return trackingErrorFac * trackingErrorFac * n  / (p * p);
+    return trackingErrorFac * trackingErrorFac * n / (p * p);
 }
 
 
@@ -1781,22 +1781,19 @@ inline float DepthMap::doLineStereo(
     const Eigen::Vector2f nominators =
         inv_cp.head(2)*referenceFrame->otherToThis_t[2] -
         referenceFrame->otherToThis_t.head(2);
+    const Eigen::Vector2f beta =
+        RKinvP.head(2)*referenceFrame->otherToThis_t[2] -
+        RKinvP[2]*referenceFrame->otherToThis_t.head(2);
     const Eigen::Vector2f idnew_best_matches =
         (RKinvP.head(2) - inv_cp.head(2)*RKinvP[2]).array() /
         nominators.array();
 
     if(search_step[0]*search_step[0]>search_step[1]*search_step[1]) {
         idnew_best_match = idnew_best_matches[0];
-        alpha = search_step[0] * fxi * (
-            RKinvP[0]*referenceFrame->otherToThis_t[2] -
-            RKinvP[2]*referenceFrame->otherToThis_t[0]
-        ) / (nominators[0]*nominators[0]);
+        alpha = search_step[0] * fxi * beta[0] / (nominators[0]*nominators[0]);
     } else {
         idnew_best_match = idnew_best_matches[1];
-        alpha = search_step[1] * fyi * (
-            RKinvP[1]*referenceFrame->otherToThis_t[2] -
-            RKinvP[2]*referenceFrame->otherToThis_t[1]
-        ) / (nominators[1]*nominators[1]);
+        alpha = search_step[1] * fyi * beta[1] / (nominators[1]*nominators[1]);
     }
 
     if(idnew_best_match < 0) {
@@ -1822,8 +1819,9 @@ inline float DepthMap::doLineStereo(
     // geometric and photometric error.
     float coeff = (interpolate_prev || interpolate_next) ? 0.05f : 0.5f;
     const float photoDispError = 4 * cameraPixelNoise2 / (gradAlongLine + DIVISION_EPS);
-    result_var = alpha*alpha*(coeff*sampleDist*sampleDist +
-                              geoDispError + photoDispError);	// square to make variance
+    // square to make variance
+    result_var = alpha*alpha*(
+        coeff*sampleDist*sampleDist + geoDispError + photoDispError);
 
     if(plotStereoImages)
     {
