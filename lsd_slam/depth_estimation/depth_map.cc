@@ -1470,10 +1470,10 @@ inline float DepthMap::doLineStereo(
     float &result_idepth, float &result_var, float &result_eplLength) {
     const Eigen::Vector2i image_size(width, height);
 
-    Eigen::Vector2f epipolar_direction;
+    Eigen::Vector2f key_epipolar_direction;
     bool isGood = makeAndCheckEPL(keyframe_coordinate_,
                                   referenceFrame->thisToOther_t,
-                                  epipolar_direction);
+                                  key_epipolar_direction);
     if(!isGood) return -5;
 
     // stats->num_stereo_calls++;
@@ -1482,20 +1482,23 @@ inline float DepthMap::doLineStereo(
 
     // calculate epipolar line start and end point in old image
     const Eigen::Vector3f KinvP = KInv * tohomogeneous(keyframe_coordinate);
-    const Eigen::Vector3f pReal = referenceFrame->K_otherToThis_R * KinvP / prior_idepth
+    const Eigen::Vector3f P_key = KinvP / prior_idepth;
+    // P_key seen from the reference frame
+    const Eigen::Vector3f P_ref = referenceFrame->K_otherToThis_R * P_key
                                 + referenceFrame->K_otherToThis_t;
 
-    const float rescaleFactor = pReal[2] * prior_idepth;
+    // depth ratio of P_ref per P_key
+    const float depth_ratio_ref_key = P_ref[2] * prior_idepth;
 
     if (not search_range_is_in_image_area(
-            keyframe_coordinate - 2*epipolar_direction*rescaleFactor,
-            keyframe_coordinate + 2*epipolar_direction*rescaleFactor,
+            keyframe_coordinate - 2*key_epipolar_direction*depth_ratio_ref_key,
+            keyframe_coordinate + 2*key_epipolar_direction*depth_ratio_ref_key,
             image_size)) {
         return -1;
     }
 
 
-    if(!(rescaleFactor > 0.7f && rescaleFactor < 1.4f)) {
+    if(!(depth_ratio_ref_key > 0.7f && depth_ratio_ref_key < 1.4f)) {
         // stats->num_stereo_rescale_oob++;
         return -1;
     }
@@ -1531,7 +1534,7 @@ inline float DepthMap::doLineStereo(
 
     // calculate increments in which we will step through the epipolar line.
     // they are sampleDist (or half sample dist) long
-    const Eigen::Vector2f search_step =
+    const Eigen::Vector2f ref_search_step =
         GRADIENT_SAMPLE_DIST * normalize_length(pClose - pFar);
     float eplLength = (pClose - pFar).norm();
     if(!eplLength > 0 || std::isinf(eplLength)) return -4;
@@ -1541,14 +1544,14 @@ inline float DepthMap::doLineStereo(
     }
 
     // extend one sample_dist to left & right.
-    pFar -= search_step;
-    pClose += search_step;
+    pFar -= ref_search_step;
+    pClose += ref_search_step;
 
     // make epl long enough (pad a little bit).
     if(eplLength < MIN_EPL_LENGTH_CROP) {
         float pad = (MIN_EPL_LENGTH_CROP - (eplLength)) / 2;
-        pFar -= search_step*pad;
-        pClose += search_step*pad;
+        pFar -= ref_search_step*pad;
+        pClose += ref_search_step*pad;
     }
 
     if((not is_in_image_range(pFar, image_size, SAMPLE_POINT_TO_BORDER+1)) ||
@@ -1561,7 +1564,7 @@ inline float DepthMap::doLineStereo(
     // from here on:
     // - pInf: search start-point
     // - p0: search end-point
-    // - search_step: search step in pixel
+    // - ref_search_step: search step in pixel
     // - eplLength, min_idepth, max_idepth:
     // determines search-resolution, i.e. the result's variance.
 
@@ -1586,18 +1589,18 @@ inline float DepthMap::doLineStereo(
 
     const Eigen::VectorXf &key_intensities = intensities_along_line(
         activeKeyFrameImageData, width,
-        keyframe_coordinate, epipolar_direction * rescaleFactor
+        keyframe_coordinate, key_epipolar_direction * depth_ratio_ref_key
     );
 
     Eigen::VectorXf ref_intensities(5);
     ref_intensities[0] = getInterpolatedElement(referenceFrameImage,
-                                                pFar - 2 * search_step, width);
+                                                pFar - 2 * ref_search_step, width);
     ref_intensities[1] = getInterpolatedElement(referenceFrameImage,
-                                                pFar - 1 * search_step, width);
+                                                pFar - 1 * ref_search_step, width);
     ref_intensities[2] = getInterpolatedElement(referenceFrameImage,
-                                                pFar - 0 * search_step, width);
+                                                pFar - 0 * ref_search_step, width);
     ref_intensities[3] = getInterpolatedElement(referenceFrameImage,
-                                                pFar + 1 * search_step, width);
+                                                pFar + 1 * ref_search_step, width);
 
     Eigen::Vector2f search_point_ref = pFar;
 
@@ -1620,14 +1623,14 @@ inline float DepthMap::doLineStereo(
     int curr_argmin=-1, second_argmin =-1;
 
     for (int i = 0; ; i++) {
-        if((search_step[0] < 0) != (search_point_ref[0] > pClose[0]) ||
-           (search_step[1] < 0) != (search_point_ref[1] > pClose[1])) {
+        if((ref_search_step[0] < 0) != (search_point_ref[0] > pClose[0]) ||
+           (ref_search_step[1] < 0) != (search_point_ref[1] > pClose[1])) {
             break;
         }
 
         // interpolate one new point
         ref_intensities[4] = getInterpolatedElement(
-            referenceFrameImage, search_point_ref + 2 * search_step, width);
+            referenceFrameImage, search_point_ref + 2 * ref_search_step, width);
 
         // hacky but fast way to get error and differential error:
         // switch buffer variables for last loop.
@@ -1678,7 +1681,7 @@ inline float DepthMap::doLineStereo(
 
         // stats->num_stereo_comparisons++;
 
-        search_point_ref += search_step;
+        search_point_ref += ref_search_step;
     }
 
     // if error too big, will return -3, otherwise -2.
@@ -1738,13 +1741,13 @@ inline float DepthMap::doLineStereo(
         // the error at that point is also computed by just integrating.
         if(interpolate_prev) {
             float d = grad_prev_curr / (grad_prev_curr - grad_prev_prev);
-            argmin_point_ref -= d*search_step;
+            argmin_point_ref -= d*ref_search_step;
             min_error = min_error - 2*d*grad_prev_curr
                        - (grad_prev_prev - grad_prev_curr)*d*d;
             // stats->num_stereo_interpPre++;
         } else if(interpolate_next) {
             float d = grad_next_curr / (grad_next_curr - grad_next_next);
-            argmin_point_ref += d*search_step;
+            argmin_point_ref += d*ref_search_step;
             min_error = min_error + 2*d*grad_next_curr
                        + (grad_next_next - grad_next_curr)*d*d;
             // stats->num_stereo_interpPost++;
@@ -1755,7 +1758,7 @@ inline float DepthMap::doLineStereo(
 
 
     // sampleDist is the distance in pixel at which the key_intensities[2]'s were sampled
-    const float sampleDist = GRADIENT_SAMPLE_DIST*rescaleFactor;
+    const float sampleDist = GRADIENT_SAMPLE_DIST*depth_ratio_ref_key;
 
     const float gradAlongLine = calc_grad_along_line(key_intensities, sampleDist);
 
@@ -1778,22 +1781,22 @@ inline float DepthMap::doLineStereo(
 
     const Eigen::Vector3f inv_cp = KInv * tohomogeneous(argmin_point_ref);
 
-    const Eigen::Vector2f nominators =
-        inv_cp.head(2)*referenceFrame->otherToThis_t[2] -
-        referenceFrame->otherToThis_t.head(2);
     const Eigen::Vector2f beta =
         RKinvP.head(2)*referenceFrame->otherToThis_t[2] -
         RKinvP[2]*referenceFrame->otherToThis_t.head(2);
+    const Eigen::Vector2f nominators =
+        inv_cp.head(2)*referenceFrame->otherToThis_t[2] -
+        referenceFrame->otherToThis_t.head(2);
     const Eigen::Vector2f idnew_best_matches =
         (RKinvP.head(2) - inv_cp.head(2)*RKinvP[2]).array() /
         nominators.array();
 
-    if(search_step[0]*search_step[0]>search_step[1]*search_step[1]) {
+    if(ref_search_step[0]*ref_search_step[0]>ref_search_step[1]*ref_search_step[1]) {
         idnew_best_match = idnew_best_matches[0];
-        alpha = search_step[0] * fxi * beta[0] / (nominators[0]*nominators[0]);
+        alpha = ref_search_step[0] * fxi * beta[0] / (nominators[0]*nominators[0]);
     } else {
         idnew_best_match = idnew_best_matches[1];
-        alpha = search_step[1] * fyi * beta[1] / (nominators[1]*nominators[1]);
+        alpha = ref_search_step[1] * fyi * beta[1] / (nominators[1]*nominators[1]);
     }
 
     if(idnew_best_match < 0) {
@@ -1809,7 +1812,7 @@ inline float DepthMap::doLineStereo(
     const float geoDispError = calc_geometric_disparity_error(
         getInterpolatedElement42(activeKeyFrame->gradients(0),
                                  keyframe_coordinate, width),
-        epipolar_direction,
+        key_epipolar_direction,
         referenceFrame->initialTrackedResidual
     );
 
@@ -1839,8 +1842,8 @@ inline float DepthMap::doLineStereo(
 //			float eplLengthF = std::min((float)MIN_EPL_LENGTH_CROP,(float)eplLength);
 //			eplLengthF = std::max((float)MAX_EPL_LENGTH_CROP,(float)eplLengthF);
 //
-//			float pixelDistFound = sqrtf((float)((pReal[0]/pReal[2] - argmin_point_ref[0])*(pReal[0]/pReal[2] - argmin_point_ref[0])
-//					+ (pReal[1]/pReal[2] - argmin_point_ref[1])*(pReal[1]/pReal[2] - argmin_point_ref[1])));
+//			float pixelDistFound = sqrtf((float)((P_ref[0]/P_ref[2] - argmin_point_ref[0])*(P_ref[0]/P_ref[2] - argmin_point_ref[0])
+//					+ (P_ref[1]/P_ref[2] - argmin_point_ref[1])*(P_ref[1]/P_ref[2] - argmin_point_ref[1])));
 //
             float fac = min_error / (
                 (float)MAX_ERROR_STEREO + sqrtf(gradAlongLine) * 20
@@ -1850,10 +1853,10 @@ inline float DepthMap::doLineStereo(
 
 
             /*
-            if(rescaleFactor > 1)
-            	color = cv::Scalar(500*(rescaleFactor-1),0,0);
+            if(depth_ratio_ref_key > 1)
+            	color = cv::Scalar(500*(depth_ratio_ref_key-1),0,0);
             else
-            	color = cv::Scalar(0,500*(1-rescaleFactor),500*(1-rescaleFactor));
+            	color = cv::Scalar(0,500*(1-depth_ratio_ref_key),500*(1-depth_ratio_ref_key));
             */
 
             cv::line(debugImageStereoLines,cv::Point2f(pClose[0], pClose[1]),
