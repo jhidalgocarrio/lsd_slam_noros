@@ -246,8 +246,7 @@ bool DepthMap::makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
     }
 
     // ===== DONE - return "normalized" epl =====
-    float fac = REFERENCE_SAMPLE_DISTANCE / sqrt(epipolar_length_squared);
-    pep = epipolar_line * fac;
+    pep = epipolar_line / sqrt(epipolar_length_squared);
 
     return true;
 }
@@ -1490,22 +1489,22 @@ inline float DepthMap::doLineStereo(
 
     const float idepth_ref = 1 / P_ref[2];
     // depth ratio of P_ref per P_key
-    const float depth_ratio_ref_key = prior_idepth_key / idepth_ref;
+    const float inv_depth_ratio = prior_idepth_key / idepth_ref;
+
+    const float key_sample_distance =
+        REFERENCE_SAMPLE_DISTANCE * inv_depth_ratio;
 
     if (not search_range_is_in_image_area(
-            keyframe_coordinate - 2*key_epipolar_direction*depth_ratio_ref_key,
-            keyframe_coordinate + 2*key_epipolar_direction*depth_ratio_ref_key,
+            keyframe_coordinate - 2*key_epipolar_direction*key_sample_distance,
+            keyframe_coordinate + 2*key_epipolar_direction*key_sample_distance,
             image_size)) {
         return -1;
     }
 
-
-    if(!(depth_ratio_ref_key > 0.7f && depth_ratio_ref_key < 1.4f)) {
+    if(!(inv_depth_ratio > 0.7f && inv_depth_ratio < 1.4f)) {
         // stats->num_stereo_rescale_oob++;
         return -1;
     }
-
-  //	if(referenceFrame->K_otherToThis_t[2] * max_idepth_along_t + pInf[2] < 0.01)
 
     Eigen::Vector3f _pClose = referenceFrame->K_otherToThis_R * KinvP
                             + referenceFrame->K_otherToThis_t * max_idepth_along_t;
@@ -1591,7 +1590,7 @@ inline float DepthMap::doLineStereo(
 
     const Eigen::VectorXf &key_intensities = intensities_along_line(
         activeKeyFrameImageData, width,
-        keyframe_coordinate, key_epipolar_direction * depth_ratio_ref_key
+        keyframe_coordinate, key_epipolar_direction * key_sample_distance
     );
 
     Eigen::VectorXf ref_intensities(5);
@@ -1759,10 +1758,6 @@ inline float DepthMap::doLineStereo(
     }
 
 
-    // key_sample_distance is the distance in pixel
-    // at which the key_intensities[2]'s were sampled
-    const float key_sample_distance = REFERENCE_SAMPLE_DISTANCE * depth_ratio_ref_key;
-
     const float gradAlongLine = calc_grad_along_line(key_intensities, key_sample_distance);
 
     // check if interpolated error is OK. use evil hack to allow more error if there is a lot of gradient.
@@ -1818,7 +1813,7 @@ inline float DepthMap::doLineStereo(
     const float geoDispError = calc_geometric_disparity_error(
         getInterpolatedElement42(activeKeyFrame->gradients(0),
                                  keyframe_coordinate, width),
-        key_epipolar_direction,
+        key_epipolar_direction * REFERENCE_SAMPLE_DISTANCE,
         referenceFrame->initialTrackedResidual
     );
 
@@ -1856,14 +1851,6 @@ inline float DepthMap::doLineStereo(
             );
 
             cv::Scalar color = cv::Scalar(255*fac, 255-255*fac, 0);// bw
-
-
-            /*
-            if(depth_ratio_ref_key > 1)
-            	color = cv::Scalar(500*(depth_ratio_ref_key-1),0,0);
-            else
-            	color = cv::Scalar(0,500*(1-depth_ratio_ref_key),500*(1-depth_ratio_ref_key));
-            */
 
             cv::line(debugImageStereoLines,cv::Point2f(pClose[0], pClose[1]),
                      cv::Point2f(pFar[0], pFar[1]),color,1,8,0);
