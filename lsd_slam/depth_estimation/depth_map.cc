@@ -246,7 +246,7 @@ bool DepthMap::makeAndCheckEPL(const Eigen::Vector2i &keyframe_coordinate,
     }
 
     // ===== DONE - return "normalized" epl =====
-    float fac = GRADIENT_SAMPLE_DIST / sqrt(epipolar_length_squared);
+    float fac = REFERENCE_SAMPLE_DISTANCE / sqrt(epipolar_length_squared);
     pep = epipolar_line * fac;
 
     return true;
@@ -1465,7 +1465,8 @@ Eigen::VectorXf intensities_along_line(const float *image, const int image_width
 // returns error if sucessful; -1 if out of bounds, -2 if not found.
 inline float DepthMap::doLineStereo(
     const Eigen::Vector2i &keyframe_coordinate_,
-    const float min_idepth, const float prior_idepth, float max_idepth,
+    const float min_idepth_along_t, const float prior_idepth_key,
+    float max_idepth_along_t,
     const Frame* const referenceFrame, const float* referenceFrameImage,
     float &result_idepth, float &result_var, float &result_eplLength) {
     const Eigen::Vector2i image_size(width, height);
@@ -1482,13 +1483,14 @@ inline float DepthMap::doLineStereo(
 
     // calculate epipolar line start and end point in old image
     const Eigen::Vector3f KinvP = KInv * tohomogeneous(keyframe_coordinate);
-    const Eigen::Vector3f P_key = KinvP / prior_idepth;
+    const Eigen::Vector3f P_key = KinvP / prior_idepth_key;
     // P_key seen from the reference frame
     const Eigen::Vector3f P_ref = referenceFrame->K_otherToThis_R * P_key
                                 + referenceFrame->K_otherToThis_t;
 
+    const float idepth_ref = 1 / P_ref[2];
     // depth ratio of P_ref per P_key
-    const float depth_ratio_ref_key = P_ref[2] * prior_idepth;
+    const float depth_ratio_ref_key = prior_idepth_key / idepth_ref;
 
     if (not search_range_is_in_image_area(
             keyframe_coordinate - 2*key_epipolar_direction*depth_ratio_ref_key,
@@ -1503,29 +1505,29 @@ inline float DepthMap::doLineStereo(
         return -1;
     }
 
-  //	if(referenceFrame->K_otherToThis_t[2] * max_idepth + pInf[2] < 0.01)
+  //	if(referenceFrame->K_otherToThis_t[2] * max_idepth_along_t + pInf[2] < 0.01)
 
     Eigen::Vector3f _pClose = referenceFrame->K_otherToThis_R * KinvP
-                            + referenceFrame->K_otherToThis_t * max_idepth;
+                            + referenceFrame->K_otherToThis_t * max_idepth_along_t;
     // if the assumed close-point lies behind the
     // image, have to change that.
     if(_pClose[2] < 0.001) {
         const Eigen::Vector3f pInf = referenceFrame->K_otherToThis_R * KinvP;
-        max_idepth = (0.001-pInf[2]) / referenceFrame->K_otherToThis_t[2];
-        _pClose = pInf + referenceFrame->K_otherToThis_t*max_idepth;
+        max_idepth_along_t = (0.001-pInf[2]) / referenceFrame->K_otherToThis_t[2];
+        _pClose = pInf + referenceFrame->K_otherToThis_t*max_idepth_along_t;
     }
-    // pos in new image of point (xy), assuming max_idepth
+    // pos in new image of point (xy), assuming max_idepth_along_t
     Eigen::Vector2f pClose = projection(_pClose);
 
     Eigen::Vector3f _pFar = referenceFrame->K_otherToThis_R * KinvP
-                          + referenceFrame->K_otherToThis_t * min_idepth;
+                          + referenceFrame->K_otherToThis_t * min_idepth_along_t;
     // if the assumed far-point lies behind the image or closter than the near-point,
     // we moved past the Point it and should stop.
-    if(_pFar[2] < 0.001 || max_idepth < min_idepth) {
+    if(_pFar[2] < 0.001 || max_idepth_along_t < min_idepth_along_t) {
         // stats->num_stereo_inf_oob++;
         return -1;
     }
-    // pos in new image of point (xy), assuming min_idepth
+    // pos in new image of point (xy), assuming min_idepth_along_t
     Eigen::Vector2f pFar = projection(_pFar);
 
     // check for nan due to eg division by zero.
@@ -1533,9 +1535,9 @@ inline float DepthMap::doLineStereo(
     //     return -4;
 
     // calculate increments in which we will step through the epipolar line.
-    // they are sampleDist (or half sample dist) long
+    // they are key_sample_distance (or half sample dist) long
     const Eigen::Vector2f ref_search_step =
-        GRADIENT_SAMPLE_DIST * normalize_length(pClose - pFar);
+        REFERENCE_SAMPLE_DISTANCE * normalize_length(pClose - pFar);
     float eplLength = (pClose - pFar).norm();
     if(!eplLength > 0 || std::isinf(eplLength)) return -4;
 
@@ -1565,7 +1567,7 @@ inline float DepthMap::doLineStereo(
     // - pInf: search start-point
     // - p0: search end-point
     // - ref_search_step: search step in pixel
-    // - eplLength, min_idepth, max_idepth:
+    // - eplLength, min_idepth_along_t, max_idepth_along_t:
     // determines search-resolution, i.e. the result's variance.
 
     /*
@@ -1757,10 +1759,11 @@ inline float DepthMap::doLineStereo(
     }
 
 
-    // sampleDist is the distance in pixel at which the key_intensities[2]'s were sampled
-    const float sampleDist = GRADIENT_SAMPLE_DIST*depth_ratio_ref_key;
+    // key_sample_distance is the distance in pixel
+    // at which the key_intensities[2]'s were sampled
+    const float key_sample_distance = REFERENCE_SAMPLE_DISTANCE * depth_ratio_ref_key;
 
-    const float gradAlongLine = calc_grad_along_line(key_intensities, sampleDist);
+    const float gradAlongLine = calc_grad_along_line(key_intensities, key_sample_distance);
 
     // check if interpolated error is OK. use evil hack to allow more error if there is a lot of gradient.
     if(min_error > (float)MAX_ERROR_STEREO + sqrtf(gradAlongLine)*20) {
@@ -1780,23 +1783,26 @@ inline float DepthMap::doLineStereo(
     float alpha;
 
     const Eigen::Vector3f inv_cp = KInv * tohomogeneous(argmin_point_ref);
-
+    const Eigen::Vector3f &key_to_ref_t = referenceFrame->otherToThis_t;
     const Eigen::Vector2f beta =
-        RKinvP.head(2)*referenceFrame->otherToThis_t[2] -
-        RKinvP[2]*referenceFrame->otherToThis_t.head(2);
+        RKinvP.head(2) * key_to_ref_t[2] - RKinvP[2] * key_to_ref_t.head(2);
     const Eigen::Vector2f nominators =
-        inv_cp.head(2)*referenceFrame->otherToThis_t[2] -
-        referenceFrame->otherToThis_t.head(2);
+        inv_cp.head(2) * key_to_ref_t[2] - inv_cp[2] * key_to_ref_t.head(2);
+    const Eigen::Vector2f inv_focal_lengths(fxi, fyi);
+    const Eigen::Vector2f alphas =
+        ref_search_step.array() * inv_focal_lengths.array() * beta.array() /
+        (nominators.array() * nominators.array());
+
     const Eigen::Vector2f idnew_best_matches =
-        (RKinvP.head(2) - inv_cp.head(2)*RKinvP[2]).array() /
+        (RKinvP.head(2) * inv_cp[2] - RKinvP[2] * inv_cp.head(2)).array() /
         nominators.array();
 
     if(ref_search_step[0]*ref_search_step[0]>ref_search_step[1]*ref_search_step[1]) {
         idnew_best_match = idnew_best_matches[0];
-        alpha = ref_search_step[0] * fxi * beta[0] / (nominators[0]*nominators[0]);
+        alpha = alphas[0];
     } else {
         idnew_best_match = idnew_best_matches[1];
-        alpha = ref_search_step[1] * fyi * beta[1] / (nominators[1]*nominators[1]);
+        alpha = alphas[1];
     }
 
     if(idnew_best_match < 0) {
@@ -1824,7 +1830,7 @@ inline float DepthMap::doLineStereo(
     const float photoDispError = 4 * cameraPixelNoise2 / (gradAlongLine + DIVISION_EPS);
     // square to make variance
     result_var = alpha*alpha*(
-        coeff*sampleDist*sampleDist + geoDispError + photoDispError);
+        coeff*key_sample_distance*key_sample_distance + geoDispError + photoDispError);
 
     if(plotStereoImages)
     {

@@ -115,7 +115,7 @@ namespace lsd_slam
 #define MIN_EPL_LENGTH_CROP (3) // minimum length of epl to search.
 
 // this is the distance of the sample points used for the stereo descriptor.
-#define GRADIENT_SAMPLE_DIST 1.0f
+#define REFERENCE_SAMPLE_DISTANCE 1.0f
 
 // pixel a point needs to be away from border... if too small: segfaults!
 #define SAMPLE_POINT_TO_BORDER 7
