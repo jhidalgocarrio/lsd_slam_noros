@@ -86,6 +86,9 @@ public:
     void trackFrame(uchar* image, unsigned int frameID, bool blockUntilMapped,
                     double timestamp);
 
+    void trackFrame(uchar* image, unsigned int frameID, bool blockUntilMapped,
+                    double timestamp, std::ofstream &file);
+
     // finalizes the system, i.e. blocks and does all remaining loop-closures etc.
     void finalize();
 

@@ -231,6 +231,8 @@ int main(int argc, char* argv[])
     cv::Mat image = cv::Mat(h,w,CV_8U);
     int runningIDX=0;
     float fakeTimeStamp = 0;
+    std::ofstream file;
+    file.open("trajectory.txt");
 
     //ros::Rate r(hz);
 
@@ -248,7 +250,7 @@ int main(int argc, char* argv[])
         if(runningIDX == 0)
             system->randomInit(image.data, fakeTimeStamp, runningIDX);
         else
-            system->trackFrame(image.data, runningIDX, false,fakeTimeStamp);
+            system->trackFrame(image.data, runningIDX, false,fakeTimeStamp, file);
         runningIDX++;
         fakeTimeStamp+=0.03;
 
@@ -270,6 +272,8 @@ int main(int argc, char* argv[])
 
         //ros::spinOnce();
     }
+
+    file.close();
 
 
     system->finalize();

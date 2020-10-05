@@ -1055,7 +1055,6 @@ void SlamSystem::trackFrame(uchar* image, unsigned int frameID,
         outputWrapper->publishTrackedFrame(trackingNewFrame.get());
     }
 
-
     // Keyframe selection
     latestTrackedFrame = trackingNewFrame;
     if (!my_createNewKeyframe
@@ -1115,6 +1114,27 @@ void SlamSystem::trackFrame(uchar* image, unsigned int frameID,
         lock.unlock();
     }
 }
+
+
+void SlamSystem::trackFrame(uchar* image, unsigned int frameID, bool blockUntilMapped,
+                    double timestamp, std::ofstream &file)
+{
+    this->trackFrame(image, frameID, blockUntilMapped, timestamp);
+
+    Sim3 tf_cam_to_world = currentKeyFrame->getScaledCamToWorld();
+    Sophus::Vector3d trans = tf_cam_to_world.translation();
+    Sophus::Quaterniond quat = tf_cam_to_world.quaternion();
+    file<<trans[0]<<" "<<
+               trans[1]<<" "<<
+                trans[2]<<" "<<
+                quat.x()<<" "<<
+                quat.y()<<" "<<
+                quat.z()<<" "<<
+                quat.w()<<std::endl;
+
+
+}
+
 
 
 float SlamSystem::tryTrackSim3(
